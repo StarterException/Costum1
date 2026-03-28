@@ -507,15 +507,35 @@ function OrionLib:MakeWindow(WindowConfig)
 		end	
 	end
 
-	local TabHolder = AddThemeObject(SetChildren(SetProps(MakeElement("ScrollFrame", Color3.fromRGB(255, 255, 255), 3), {
-		Size = UDim2.new(1, 0, 1, -54)
+	local TabSearchRegistry = {}
+	local SelectedTabButton = nil
+	local SidebarW = 204
+
+	local TabHolder = AddThemeObject(SetChildren(SetProps(MakeElement("ScrollFrame", Color3.fromRGB(255, 255, 255), 2), {
+		Size = UDim2.new(1, 0, 1, -102),
+		Position = UDim2.new(0, 0, 0, 44)
 	}), {
-		MakeElement("List", 0, 6),
-		MakeElement("Padding", 10, 6, 6, 10)
+		MakeElement("List", 0, 8),
+		MakeElement("Padding", 12, 10, 10, 12)
 	}), "Divider")
-	TabHolder.AutomaticCanvasSize = Enum.AutomaticSize.Y
 	TabHolder.ScrollingDirection = Enum.ScrollingDirection.Y
-	TabHolder.ScrollBarImageTransparency = 0.35
+	TabHolder.ScrollBarImageTransparency = 0.92
+	TabHolder.ScrollBarThickness = 4
+	pcall(function()
+		TabHolder.VerticalScrollBarInset = Enum.ScrollBarInset.ScrollBar
+	end)
+	pcall(function()
+		TabHolder.AutomaticCanvasSize = Enum.AutomaticSize.None
+	end)
+
+	local function RefreshTabHolderCanvas()
+		local lay = TabHolder:FindFirstChildOfClass("UIListLayout")
+		if lay then
+			TabHolder.CanvasSize = UDim2.new(0, 0, 0, math.max(lay.AbsoluteContentSize.Y + 28, 4))
+		end
+	end
+
+	AddConnection(TabHolder.UIListLayout:GetPropertyChangedSignal("AbsoluteContentSize"), RefreshTabHolderCanvas)
 
 	local CloseBtn = SetChildren(SetProps(MakeElement("Button"), {
 		Size = UDim2.new(0.5, 0, 1, 0),
@@ -543,75 +563,64 @@ function OrionLib:MakeWindow(WindowConfig)
 		Size = UDim2.new(1, 0, 0, 54)
 	})
 
-	local WindowStuff = AddThemeObject(SetChildren(SetProps(MakeElement("RoundFrame", Color3.fromRGB(255, 255, 255), 0, 12), {
-		Size = UDim2.new(0, 182, 1, -54),
+	local WindowStuff = AddThemeObject(SetChildren(SetProps(MakeElement("RoundFrame", Color3.fromRGB(255, 255, 255), 0, 18), {
+		Size = UDim2.new(0, SidebarW, 1, -54),
 		Position = UDim2.new(0, 0, 0, 54)
 	}), {
 		AddThemeObject(SetProps(MakeElement("Frame"), {
-			Size = UDim2.new(1, 0, 0, 10),
-			Position = UDim2.new(0, 0, 0, 0)
-		}), "Second"), 
-		AddThemeObject(SetProps(MakeElement("Frame"), {
-			Size = UDim2.new(0, 10, 1, 0),
-			Position = UDim2.new(1, -10, 0, 0)
-		}), "Second"), 
-		AddThemeObject(SetProps(MakeElement("Frame"), {
 			Size = UDim2.new(0, 1, 1, 0),
-			Position = UDim2.new(1, -1, 0, 0)
-		}), "Stroke"), 
+			Position = UDim2.new(1, -1, 0, 0),
+			BackgroundTransparency = 0.65
+		}), "Stroke"),
+		SetChildren(SetProps(MakeElement("TFrame"), {
+			Size = UDim2.new(1, 0, 0, 36),
+			Position = UDim2.new(0, 0, 0, 8),
+			Name = "SidebarHeader"
+		}), {
+			AddThemeObject(SetProps(MakeElement("Label", "Navigation", 11), {
+				Size = UDim2.new(1, -20, 1, 0),
+				Position = UDim2.new(0, 14, 0, 0),
+				Font = Enum.Font.GothamBold,
+				TextTransparency = 0.35,
+				TextXAlignment = Enum.TextXAlignment.Left
+			}), "TextDark")
+		}),
 		TabHolder,
 		SetChildren(SetProps(MakeElement("TFrame"), {
-			Size = UDim2.new(1, 0, 0, 54),
-			Position = UDim2.new(0, 0, 1, -54)
+			Size = UDim2.new(1, 0, 0, 58),
+			Position = UDim2.new(0, 0, 1, -58)
 		}), {
 			AddThemeObject(SetProps(MakeElement("Frame"), {
-				Size = UDim2.new(1, 0, 0, 1)
-			}), "Stroke"), 
-			AddThemeObject(SetChildren(SetProps(MakeElement("Frame"), {
-				AnchorPoint = Vector2.new(0, 0.5),
-				Size = UDim2.new(0, 32, 0, 32),
-				Position = UDim2.new(0, 10, 0.5, 0)
-			}), {
-				SetProps(MakeElement("Image", "https://www.roblox.com/headshot-thumbnail/image?userId=".. LocalPlayer.UserId .."&width=420&height=420&format=png"), {
-					Size = UDim2.new(1, 0, 1, 0)
-				}),
-				AddThemeObject(SetProps(MakeElement("Image", "rbxassetid://4031889928"), {
-					Size = UDim2.new(1, 0, 1, 0),
-				}), "Second"),
-				MakeElement("Corner", 1)
-			}), "Divider"),
-			SetChildren(SetProps(MakeElement("TFrame"), {
-				AnchorPoint = Vector2.new(0, 0.5),
-				Size = UDim2.new(0, 32, 0, 32),
-				Position = UDim2.new(0, 10, 0.5, 0)
-			}), {
-				AddThemeObject(MakeElement("Stroke"), "Stroke"),
-				MakeElement("Corner", 1)
-			}),
-			AddThemeObject(SetProps(MakeElement("Label", WindowConfig.BrandName, 13), {
-				Size = UDim2.new(1, -60, 0, 14),
-				Position = UDim2.new(0, 50, 0, 11),
+				Size = UDim2.new(1, -16, 0, 1),
+				Position = UDim2.new(0, 8, 0, 0)
+			}), "Stroke"),
+			AddThemeObject(SetProps(MakeElement("Label", WindowConfig.BrandName, 14), {
+				Size = UDim2.new(1, -24, 0, 16),
+				Position = UDim2.new(0, 12, 0, 12),
 				Font = Enum.Font.GothamBold,
 				ClipsDescendants = true,
-				Name = "BrandTitle"
+				Name = "BrandTitle",
+				TextXAlignment = Enum.TextXAlignment.Left
 			}), "Text"),
 			SetProps(MakeElement("Label", WindowConfig.BrandTag, 12), {
-				Size = UDim2.new(1, -60, 0, 12),
-				Position = UDim2.new(0, 50, 1, -24),
+				Size = UDim2.new(1, -24, 0, 14),
+				Position = UDim2.new(0, 12, 0, 30),
 				Font = Enum.Font.GothamMedium,
 				TextColor3 = OrionLib.Themes[OrionLib.SelectedTheme].Accent,
-				TextTransparency = 0.12,
+				TextTransparency = 0.08,
 				Visible = WindowConfig.BrandTag ~= "",
-				Name = "BrandTag"
+				Name = "BrandTag",
+				TextXAlignment = Enum.TextXAlignment.Left
 			})
 		}),
 	}), "Second")
 
 	local WindowName = AddThemeObject(SetProps(MakeElement("Label", WindowConfig.Name, 14), {
-		Size = UDim2.new(1, -36, 2, 0),
+		Size = UDim2.new(1, -300, 2, 0),
 		Position = UDim2.new(0, 28, 0, -26),
 		Font = Enum.Font.GothamBold,
-		TextSize = 19
+		TextSize = 19,
+		TextTruncate = Enum.TextTruncate.AtEnd
 	}), "Text")
 
 	local WindowTopBarLine = AddThemeObject(SetProps(MakeElement("Frame"), {
@@ -619,28 +628,51 @@ function OrionLib:MakeWindow(WindowConfig)
 		Position = UDim2.new(0, 0, 1, -1)
 	}), "Stroke")
 
-	local MainWindow = AddThemeObject(SetChildren(SetProps(MakeElement("RoundFrame", Color3.fromRGB(255, 255, 255), 0, 16), {
+	local MainWindow = AddThemeObject(SetChildren(SetProps(MakeElement("RoundFrame", Color3.fromRGB(255, 255, 255), 0, 22), {
 		Parent = Orion,
 		Position = UDim2.new(0.5, -324, 0.5, -190),
 		Size = UDim2.new(0, 648, 0, 380),
 		ClipsDescendants = true
 	}), {
-		AddThemeObject(SetProps(MakeElement("Frame"), {
-			Size = UDim2.new(1, 0, 0, 2),
-			Position = UDim2.new(0, 0, 0, 0),
-			BorderSizePixel = 0,
-			BackgroundTransparency = 0.12,
-			Name = "TopGlow"
-		}), "Accent"),
 		SetChildren(SetProps(MakeElement("TFrame"), {
 			Size = UDim2.new(1, 0, 0, 54),
 			Name = "TopBar"
 		}), {
 			WindowName,
 			WindowTopBarLine,
-			AddThemeObject(SetChildren(SetProps(MakeElement("RoundFrame", Color3.fromRGB(255, 255, 255), 0, 10), {
-				Size = UDim2.new(0, 76, 0, 32),
-				Position = UDim2.new(1, -94, 0, 11),
+			AddThemeObject(SetChildren(SetProps(MakeElement("RoundFrame", Color3.fromRGB(255, 255, 255), 0, 14), {
+				Size = UDim2.new(0, 178, 0, 36),
+				Position = UDim2.new(1, -286, 0, 9),
+				Name = "TabSearchBar",
+				BackgroundTransparency = 0.55,
+				ClipsDescendants = true
+			}), {
+				AddThemeObject(MakeElement("Stroke"), "Stroke"),
+				AddThemeObject(SetProps(MakeElement("Image", "rbxassetid://6031094677"), {
+					Size = UDim2.new(0, 16, 0, 16),
+					Position = UDim2.new(0, 12, 0.5, -8),
+					ImageTransparency = 0.25,
+					Name = "SearchIco"
+				}), "TextDark"),
+				Create("TextBox", {
+					Name = "TabSearchInput",
+					Size = UDim2.new(1, -40, 0, 24),
+					Position = UDim2.new(0, 34, 0.5, -12),
+					BackgroundTransparency = 1,
+					Text = "",
+					PlaceholderText = "Tabs durchsuchen…",
+					TextColor3 = OrionLib.Themes[OrionLib.SelectedTheme].Text,
+					PlaceholderColor3 = OrionLib.Themes[OrionLib.SelectedTheme].TextDark,
+					TextSize = 14,
+					Font = Enum.Font.GothamMedium,
+					ClearTextOnFocus = false,
+					TextXAlignment = Enum.TextXAlignment.Left,
+					TextTruncate = Enum.TextTruncate.AtEnd
+				})
+			}), "Second"),
+			AddThemeObject(SetChildren(SetProps(MakeElement("RoundFrame", Color3.fromRGB(255, 255, 255), 0, 14), {
+				Size = UDim2.new(0, 82, 0, 36),
+				Position = UDim2.new(1, -94, 0, 9),
 				Name = "WinControls",
 				BackgroundTransparency = 0.48
 			}), {
@@ -668,6 +700,27 @@ function OrionLib:MakeWindow(WindowConfig)
 		})
 		WindowIcon.Parent = MainWindow.TopBar
 	end	
+
+	local function ApplyTabSearchFilter()
+		local bar = MainWindow.TopBar:FindFirstChild("TabSearchBar")
+		if not bar then return end
+		local inp = bar:FindFirstChild("TabSearchInput")
+		if not inp then return end
+		local q = string.lower((inp.Text or ""):gsub("^%s+", ""):gsub("%s+$", ""))
+		for _, entry in ipairs(TabSearchRegistry) do
+			local show = q == "" or string.find(entry.Key, q, 1, true) ~= nil or entry.Frame == SelectedTabButton
+			entry.Frame.Visible = show
+		end
+		RefreshTabHolderCanvas()
+	end
+
+	local searchBar = MainWindow.TopBar:FindFirstChild("TabSearchBar")
+	if searchBar then
+		local sInput = searchBar:FindFirstChild("TabSearchInput")
+		if sInput then
+			AddConnection(sInput:GetPropertyChangedSignal("Text"), ApplyTabSearchFilter)
+		end
+	end
 
 	AddDraggingFunctionality(DragPoint, MainWindow)
 
@@ -797,16 +850,16 @@ function OrionLib:MakeWindow(WindowConfig)
 		local TAccent = OrionLib.Themes[OrionLib.SelectedTheme].Accent
 		local TSecond = OrionLib.Themes[OrionLib.SelectedTheme].Second
 		local TabFrame = SetChildren(SetProps(MakeElement("Button"), {
-			Size = UDim2.new(1, 0, 0, 38),
+			Size = UDim2.new(1, 0, 0, 42),
 			Parent = TabHolder,
 			ZIndex = 2
 		}), {
-			AddThemeObject(SetProps(MakeElement("RoundFrame", Color3.fromRGB(255, 255, 255), 0, 10), {
-				Size = UDim2.new(1, -8, 1, -6),
-				Position = UDim2.new(0, 4, 0, 3),
+			AddThemeObject(SetProps(MakeElement("RoundFrame", Color3.fromRGB(255, 255, 255), 0, 14), {
+				Size = UDim2.new(1, -10, 1, -8),
+				Position = UDim2.new(0, 5, 0, 4),
 				Name = "TabBg",
 				ZIndex = 0,
-				BackgroundTransparency = 0.9
+				BackgroundTransparency = 0.88
 			}), "Second"),
 			AddThemeObject(SetProps(MakeElement("Image", TabConfig.Icon), {
 				AnchorPoint = Vector2.new(0, 0.5),
@@ -853,8 +906,8 @@ function OrionLib:MakeWindow(WindowConfig)
 		end
 
 		local Container = AddThemeObject(SetChildren(SetProps(MakeElement("ScrollFrame", Color3.fromRGB(255, 255, 255), 4), {
-			Size = UDim2.new(1, -182, 1, -54),
-			Position = UDim2.new(0, 182, 0, 54),
+			Size = UDim2.new(1, -SidebarW, 1, -54),
+			Position = UDim2.new(0, SidebarW, 0, 54),
 			Parent = MainWindow,
 			Visible = false,
 			Name = "ItemContainer",
@@ -868,11 +921,13 @@ function OrionLib:MakeWindow(WindowConfig)
 
 		if FirstTab then
 			FirstTab = false
+			SelectedTabButton = TabFrame
 			TabApplyVisual(TabFrame, true)
 			Container.Visible = true
 		end    
 
 		AddConnection(TabFrame.MouseButton1Click, function()
+			SelectedTabButton = TabFrame
 			for _, Tab in next, TabHolder:GetChildren() do
 				if Tab:IsA("TextButton") then
 					TabApplyVisual(Tab, false)
@@ -887,21 +942,33 @@ function OrionLib:MakeWindow(WindowConfig)
 			Container.Visible = true   
 		end)
 
+		table.insert(TabSearchRegistry, { Frame = TabFrame, Key = string.lower(TabConfig.Name) })
+		task.defer(RefreshTabHolderCanvas)
+
 		local function GetElements(ItemParent)
 			local ElementFunction = {}
 			function ElementFunction:AddLabel(Text)
-				local LabelFrame = AddThemeObject(SetChildren(SetProps(MakeElement("RoundFrame", Color3.fromRGB(255, 255, 255), 0, 10), {
-					Size = UDim2.new(1, 0, 0, 32),
-					BackgroundTransparency = 0.65,
+				local LAcc = OrionLib.Themes[OrionLib.SelectedTheme].Accent
+				local LabelFrame = AddThemeObject(SetChildren(SetProps(MakeElement("RoundFrame", Color3.fromRGB(255, 255, 255), 0, 14), {
+					Size = UDim2.new(1, 0, 0, 34),
+					BackgroundTransparency = 0.58,
 					Parent = ItemParent
 				}), {
+					Create("Frame", {
+						Size = UDim2.new(0, 3, 0.55, 0),
+						Position = UDim2.new(0, 12, 0.22, 0),
+						BackgroundColor3 = LAcc,
+						BorderSizePixel = 0,
+						BackgroundTransparency = 0.2
+					}, {
+						Create("UICorner", {CornerRadius = UDim.new(1, 0)})
+					}),
 					AddThemeObject(SetProps(MakeElement("Label", Text, 15), {
-						Size = UDim2.new(1, -16, 1, 0),
-						Position = UDim2.new(0, 14, 0, 0),
+						Size = UDim2.new(1, -32, 1, 0),
+						Position = UDim2.new(0, 22, 0, 0),
 						Font = Enum.Font.GothamBold,
 						Name = "Content"
-					}), "Text"),
-					AddThemeObject(MakeElement("Stroke"), "Stroke")
+					}), "Text")
 				}), "Second")
 
 				local LabelFunction = {}
@@ -914,27 +981,47 @@ function OrionLib:MakeWindow(WindowConfig)
 				Text = Text or "Text"
 				Content = Content or "Content"
 				local PAccent = OrionLib.Themes[OrionLib.SelectedTheme].Accent
+				local PSecond = OrionLib.Themes[OrionLib.SelectedTheme].Second
 
-				local ParagraphFrame = AddThemeObject(SetChildren(SetProps(MakeElement("RoundFrame", Color3.fromRGB(255, 255, 255), 0, 12), {
-					Size = UDim2.new(1, 0, 0, 88),
-					BackgroundTransparency = 0.5,
+				local ParagraphFrame = AddThemeObject(SetChildren(SetProps(MakeElement("RoundFrame", Color3.fromRGB(255, 255, 255), 0, 18), {
+					Size = UDim2.new(1, 0, 0, 96),
+					BackgroundTransparency = 0.42,
 					Parent = ItemParent
 				}), {
 					SetProps(MakeElement("Stroke", PAccent, 1), {
-						Transparency = 0.86
+						Transparency = 0.94,
+						Thickness = 1.1
 					}),
-					AddThemeObject(SetProps(MakeElement("Label", Text, 17), {
-						Size = UDim2.new(1, -36, 0, 26),
-						Position = UDim2.new(0, 18, 0, 16),
+					Create("UIGradient", {
+						Rotation = 108,
+						Color = ColorSequence.new({
+							ColorSequenceKeypoint.new(0, PSecond:Lerp(Color3.fromRGB(255, 255, 255), 0.06)),
+							ColorSequenceKeypoint.new(0.45, PSecond:Lerp(PAccent, 0.07)),
+							ColorSequenceKeypoint.new(1, PSecond)
+						})
+					}),
+					AddThemeObject(SetProps(MakeElement("Label", Text, 18), {
+						Size = UDim2.new(1, -40, 0, 28),
+						Position = UDim2.new(0, 22, 0, 18),
 						Font = Enum.Font.GothamBold,
 						TextXAlignment = Enum.TextXAlignment.Left,
 						Name = "Title"
 					}), "Text"),
+					Create("Frame", {
+						Name = "TitleUnderline",
+						Size = UDim2.new(0, 42, 0, 2),
+						Position = UDim2.new(0, 22, 0, 46),
+						BackgroundColor3 = PAccent,
+						BorderSizePixel = 0,
+						BackgroundTransparency = 0.35
+					}, {
+						Create("UICorner", {CornerRadius = UDim.new(1, 0)})
+					}),
 					AddThemeObject(SetProps(MakeElement("Label", "", 13), {
-						Size = UDim2.new(1, -36, 0, 0),
-						Position = UDim2.new(0, 18, 0, 46),
+						Size = UDim2.new(1, -40, 0, 0),
+						Position = UDim2.new(0, 22, 0, 56),
 						Font = Enum.Font.GothamMedium,
-						TextTransparency = 0.22,
+						TextTransparency = 0.18,
 						TextWrapped = true,
 						TextXAlignment = Enum.TextXAlignment.Left,
 						Name = "Content"
@@ -942,12 +1029,16 @@ function OrionLib:MakeWindow(WindowConfig)
 				}), "Second")
 
 				local function reflowParagraph()
-					local titleH = math.max(ParagraphFrame.Title.TextBounds.Y, 22)
-					ParagraphFrame.Title.Size = UDim2.new(1, -36, 0, titleH)
-					local bodyH = math.max(ParagraphFrame.Content.TextBounds.Y, 16)
-					ParagraphFrame.Content.Size = UDim2.new(1, -36, 0, bodyH)
-					ParagraphFrame.Content.Position = UDim2.new(0, 18, 0, 14 + titleH + 8)
-					ParagraphFrame.Size = UDim2.new(1, 0, 0, 16 + titleH + 8 + bodyH + 20)
+					local titleH = math.max(ParagraphFrame.Title.TextBounds.Y, 24)
+					ParagraphFrame.Title.Size = UDim2.new(1, -40, 0, titleH)
+					local und = ParagraphFrame:FindFirstChild("TitleUnderline")
+					if und then
+						und.Position = UDim2.new(0, 22, 0, 16 + titleH + 4)
+					end
+					local bodyH = math.max(ParagraphFrame.Content.TextBounds.Y, 18)
+					ParagraphFrame.Content.Size = UDim2.new(1, -40, 0, bodyH)
+					ParagraphFrame.Content.Position = UDim2.new(0, 22, 0, 16 + titleH + 14)
+					ParagraphFrame.Size = UDim2.new(1, 0, 0, 22 + titleH + 14 + bodyH + 22)
 				end
 
 				AddConnection(ParagraphFrame.Content:GetPropertyChangedSignal("Text"), reflowParagraph)
@@ -974,9 +1065,9 @@ function OrionLib:MakeWindow(WindowConfig)
 					Size = UDim2.new(1, 0, 1, 0)
 				})
 
-				local ButtonFrame = AddThemeObject(SetChildren(SetProps(MakeElement("RoundFrame", Color3.fromRGB(255, 255, 255), 0, 10), {
-					Size = UDim2.new(1, 0, 0, 36),
-					BackgroundTransparency = 0.64,
+				local ButtonFrame = AddThemeObject(SetChildren(SetProps(MakeElement("RoundFrame", Color3.fromRGB(255, 255, 255), 0, 14), {
+					Size = UDim2.new(1, 0, 0, 38),
+					BackgroundTransparency = 0.62,
 					Parent = ItemParent
 				}), {
 					AddThemeObject(SetProps(MakeElement("Label", ButtonConfig.Name, 15), {
@@ -1052,9 +1143,9 @@ function OrionLib:MakeWindow(WindowConfig)
 					}),
 				})
 
-				local ToggleFrame = AddThemeObject(SetChildren(SetProps(MakeElement("RoundFrame", Color3.fromRGB(255, 255, 255), 0, 10), {
-					Size = UDim2.new(1, 0, 0, 40),
-					BackgroundTransparency = 0.64,
+				local ToggleFrame = AddThemeObject(SetChildren(SetProps(MakeElement("RoundFrame", Color3.fromRGB(255, 255, 255), 0, 14), {
+					Size = UDim2.new(1, 0, 0, 42),
+					BackgroundTransparency = 0.62,
 					Parent = ItemParent
 				}), {
 					AddThemeObject(SetProps(MakeElement("Label", ToggleConfig.Name, 15), {
