@@ -531,11 +531,20 @@ function OrionLib:MakeWindow(WindowConfig)
 	local function RefreshTabHolderCanvas()
 		local lay = TabHolder:FindFirstChildOfClass("UIListLayout")
 		if lay then
-			TabHolder.CanvasSize = UDim2.new(0, 0, 0, math.max(lay.AbsoluteContentSize.Y + 28, 4))
+			local pad = TabHolder:FindFirstChildOfClass("UIPadding")
+			local py = 28
+			if pad then
+				py = py + pad.PaddingTop.Offset + pad.PaddingBottom.Offset
+			end
+			TabHolder.CanvasSize = UDim2.new(0, 0, 0, math.max(math.ceil(lay.AbsoluteContentSize.Y + py), 4))
 		end
 	end
 
-	AddConnection(TabHolder.UIListLayout:GetPropertyChangedSignal("AbsoluteContentSize"), RefreshTabHolderCanvas)
+	local tabListLayout = TabHolder:FindFirstChildOfClass("UIListLayout")
+	if tabListLayout then
+		AddConnection(tabListLayout:GetPropertyChangedSignal("AbsoluteContentSize"), RefreshTabHolderCanvas)
+	end
+	task.defer(RefreshTabHolderCanvas)
 
 	local CloseBtn = SetChildren(SetProps(MakeElement("Button"), {
 		Size = UDim2.new(0.5, 0, 1, 0),
@@ -706,9 +715,21 @@ function OrionLib:MakeWindow(WindowConfig)
 		if not bar then return end
 		local inp = bar:FindFirstChild("TabSearchInput")
 		if not inp then return end
-		local q = string.lower((inp.Text or ""):gsub("^%s+", ""):gsub("%s+$", ""))
+		local raw = inp.Text or ""
+		local q = string.lower((raw:gsub("^%s+", ""):gsub("%s+$", "")))
+		local ph = inp.PlaceholderText or ""
+		if ph ~= "" and raw == ph then
+			q = ""
+		end
+		if #q == 0 then
+			for _, entry in ipairs(TabSearchRegistry) do
+				entry.Frame.Visible = true
+			end
+			RefreshTabHolderCanvas()
+			return
+		end
 		for _, entry in ipairs(TabSearchRegistry) do
-			local show = q == "" or string.find(entry.Key, q, 1, true) ~= nil or entry.Frame == SelectedTabButton
+			local show = string.find(entry.Key, q, 1, true) ~= nil or entry.Frame == SelectedTabButton
 			entry.Frame.Visible = show
 		end
 		RefreshTabHolderCanvas()
@@ -916,8 +937,30 @@ function OrionLib:MakeWindow(WindowConfig)
 			MakeElement("List", 0, 8),
 			MakeElement("Padding", 18, 16, 16, 18)
 		}), "Divider")
-		Container.AutomaticCanvasSize = Enum.AutomaticSize.Y
 		Container.ScrollingDirection = Enum.ScrollingDirection.Y
+
+		local function RefreshItemContainerCanvas()
+			local lay = Container:FindFirstChildOfClass("UIListLayout")
+			if lay then
+				local pad = Container:FindFirstChildOfClass("UIPadding")
+				local py = 24
+				if pad then
+					py = py + pad.PaddingTop.Offset + pad.PaddingBottom.Offset
+				end
+				Container.CanvasSize = UDim2.new(0, 0, 0, math.max(math.ceil(lay.AbsoluteContentSize.Y + py), 1))
+			end
+		end
+		pcall(function()
+			Container.AutomaticCanvasSize = Enum.AutomaticSize.None
+		end)
+		local itemListLayout = Container:FindFirstChildOfClass("UIListLayout")
+		if itemListLayout then
+			AddConnection(itemListLayout:GetPropertyChangedSignal("AbsoluteContentSize"), RefreshItemContainerCanvas)
+		end
+		AddConnection(Container.ChildAdded, function()
+			task.defer(RefreshItemContainerCanvas)
+		end)
+		task.defer(RefreshItemContainerCanvas)
 
 		if FirstTab then
 			FirstTab = false
@@ -944,6 +987,7 @@ function OrionLib:MakeWindow(WindowConfig)
 
 		table.insert(TabSearchRegistry, { Frame = TabFrame, Key = string.lower(TabConfig.Name) })
 		task.defer(RefreshTabHolderCanvas)
+		task.defer(ApplyTabSearchFilter)
 
 		local function GetElements(ItemParent)
 			local ElementFunction = {}
@@ -1046,6 +1090,7 @@ function OrionLib:MakeWindow(WindowConfig)
 
 				ParagraphFrame.Content.Text = Content
 				reflowParagraph()
+				task.defer(reflowParagraph)
 
 				local ParagraphFunction = {}
 				function ParagraphFunction:Set(ToChange)
@@ -1864,7 +1909,7 @@ function OrionLib:MakeWindow(WindowConfig)
 				}), "Text"),
 				SetChildren(SetProps(MakeElement("TFrame"), {
 					AnchorPoint = Vector2.new(0, 0),
-					Size = UDim2.new(1, 0, 1, -32),
+					Size = UDim2.new(1, 0, 0, 0),
 					Position = UDim2.new(0, 0, 0, 32),
 					Name = "Holder"
 				}), {
@@ -1872,10 +1917,15 @@ function OrionLib:MakeWindow(WindowConfig)
 				}),
 			})
 
-			AddConnection(SectionFrame.Holder.UIListLayout:GetPropertyChangedSignal("AbsoluteContentSize"), function()
-				SectionFrame.Size = UDim2.new(1, 0, 0, SectionFrame.Holder.UIListLayout.AbsoluteContentSize.Y + 38)
-				SectionFrame.Holder.Size = UDim2.new(1, 0, 0, SectionFrame.Holder.UIListLayout.AbsoluteContentSize.Y)
-			end)
+			local secList = SectionFrame.Holder:FindFirstChildOfClass("UIListLayout")
+			if secList then
+				AddConnection(secList:GetPropertyChangedSignal("AbsoluteContentSize"), function()
+					local h = secList.AbsoluteContentSize.Y
+					SectionFrame.Holder.Size = UDim2.new(1, 0, 0, math.max(h, 1))
+					SectionFrame.Size = UDim2.new(1, 0, 0, math.max(h, 1) + 38)
+					task.defer(RefreshItemContainerCanvas)
+				end)
+			end
 
 			local SectionFunction = {}
 			for i, v in next, GetElements(SectionFrame.Holder) do
