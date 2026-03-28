@@ -1,4 +1,4 @@
--- Costum UI — Orion-kompatible API (jensonhirst/Orion); Premium-Glass-Layout & Lyphix-Theme.
+-- Costum UI — Orion-kompatible API (jensonhirst/Orion); Theme-System, Premium-Extras, Glass-Layout.
 -- Referenz: https://raw.githubusercontent.com/jensonhirst/Orion/refs/heads/main/source
 
 local UserInputService = game:GetService("UserInputService")
@@ -13,8 +13,11 @@ local OrionLib = {
 	ThemeObjects = {},
 	Connections = {},
 	Flags = {},
+	_ThemeListeners = {},
+	PremiumUnlocked = false,
 	Themes = {
 		Default = {
+			DisplayName = "Aurora",
 			Main = Color3.fromRGB(7, 9, 15),
 			Second = Color3.fromRGB(16, 19, 30),
 			Stroke = Color3.fromRGB(48, 58, 82),
@@ -23,8 +26,65 @@ local OrionLib = {
 			TextDark = Color3.fromRGB(126, 136, 168),
 			Accent = Color3.fromRGB(56, 189, 248),
 			Accent2 = Color3.fromRGB(124, 214, 255)
+		},
+		Obsidian = {
+			DisplayName = "Obsidian",
+			Main = Color3.fromRGB(4, 6, 10),
+			Second = Color3.fromRGB(12, 14, 20),
+			Stroke = Color3.fromRGB(38, 42, 56),
+			Divider = Color3.fromRGB(22, 24, 34),
+			Text = Color3.fromRGB(245, 246, 250),
+			TextDark = Color3.fromRGB(118, 124, 148),
+			Accent = Color3.fromRGB(147, 197, 253),
+			Accent2 = Color3.fromRGB(186, 220, 255)
+		},
+		Crimson = {
+			DisplayName = "Crimson",
+			Main = Color3.fromRGB(14, 8, 10),
+			Second = Color3.fromRGB(26, 14, 18),
+			Stroke = Color3.fromRGB(72, 38, 48),
+			Divider = Color3.fromRGB(40, 22, 28),
+			Text = Color3.fromRGB(255, 248, 250),
+			TextDark = Color3.fromRGB(200, 160, 170),
+			Accent = Color3.fromRGB(251, 113, 133),
+			Accent2 = Color3.fromRGB(255, 180, 190)
+		},
+		Emerald = {
+			DisplayName = "Emerald",
+			Main = Color3.fromRGB(6, 12, 10),
+			Second = Color3.fromRGB(14, 24, 20),
+			Stroke = Color3.fromRGB(36, 62, 52),
+			Divider = Color3.fromRGB(24, 42, 36),
+			Text = Color3.fromRGB(240, 255, 248),
+			TextDark = Color3.fromRGB(130, 168, 150),
+			Accent = Color3.fromRGB(52, 211, 153),
+			Accent2 = Color3.fromRGB(150, 240, 200)
+		},
+		Amethyst = {
+			DisplayName = "Amethyst",
+			Main = Color3.fromRGB(10, 8, 18),
+			Second = Color3.fromRGB(20, 16, 36),
+			Stroke = Color3.fromRGB(58, 48, 88),
+			Divider = Color3.fromRGB(36, 30, 58),
+			Text = Color3.fromRGB(248, 244, 255),
+			TextDark = Color3.fromRGB(168, 156, 210),
+			Accent = Color3.fromRGB(167, 139, 250),
+			Accent2 = Color3.fromRGB(210, 190, 255)
+		},
+		Aurum = {
+			DisplayName = "Aurum",
+			PremiumOnly = true,
+			Main = Color3.fromRGB(12, 10, 6),
+			Second = Color3.fromRGB(22, 18, 10),
+			Stroke = Color3.fromRGB(92, 72, 38),
+			Divider = Color3.fromRGB(48, 40, 22),
+			Text = Color3.fromRGB(255, 250, 235),
+			TextDark = Color3.fromRGB(210, 190, 150),
+			Accent = Color3.fromRGB(250, 204, 21),
+			Accent2 = Color3.fromRGB(255, 230, 120)
 		}
 	},
+	ThemeOrder = { "Default", "Obsidian", "Crimson", "Emerald", "Amethyst", "Aurum" },
 	SelectedTheme = "Default",
 	Folder = nil,
 	SaveCfg = false
@@ -208,14 +268,40 @@ local function AddThemeObject(Object, Type)
 end    
 
 local function SetTheme()
-	for Name, Type in pairs(OrionLib.ThemeObjects) do
-		local C = OrionLib.Themes[OrionLib.SelectedTheme][Name]
-		if C then
-			for _, Object in pairs(Type) do
-				Object[ReturnProperty(Object)] = C
+	local palette = OrionLib.Themes[OrionLib.SelectedTheme]
+	if not palette then
+		return
+	end
+	for slotName, objects in pairs(OrionLib.ThemeObjects) do
+		local C = palette[slotName]
+		if typeof(C) == "Color3" then
+			for _, Object in pairs(objects) do
+				if Object and Object.Parent then
+					Object[ReturnProperty(Object)] = C
+				end
 			end
 		end
 	end
+end
+
+function OrionLib:SetTheme(themeKey)
+	local palette = self.Themes[themeKey]
+	if not palette then
+		return false
+	end
+	if palette.PremiumOnly and not self.PremiumUnlocked then
+		return false
+	end
+	self.SelectedTheme = themeKey
+	SetTheme()
+	for _, fn in ipairs(self._ThemeListeners) do
+		pcall(fn)
+	end
+	return true
+end
+
+function OrionLib:GetThemeKey()
+	return self.SelectedTheme
 end
 
 local function PackColor(Color)
@@ -410,7 +496,6 @@ function OrionLib:MakeNotification(NotificationConfig)
 
 		local Th = OrionLib.Themes[OrionLib.SelectedTheme]
 		local Acc = Th.Accent
-		local MainC = Th.Main
 
 		local NotificationParent = SetProps(MakeElement("TFrame"), {
 			Size = UDim2.new(1, 0, 0, 0),
@@ -421,262 +506,218 @@ function OrionLib:MakeNotification(NotificationConfig)
 
 		local dur = NotificationConfig.Time
 
-		local NotificationFrame = SetChildren(SetProps(MakeElement("RoundFrame", MainC, 0, 22), {
+		local NotificationFrame = SetChildren(SetProps(MakeElement("RoundFrame", Th.Main, 0, 18), {
 			Parent = NotificationParent,
 			Size = UDim2.new(1, 0, 0, 0),
-			Position = UDim2.new(1, 120, 0, 0),
+			Position = UDim2.new(1, 96, 0, 0),
 			AnchorPoint = Vector2.new(0, 0),
-			BackgroundTransparency = 0.62,
+			BackgroundTransparency = 0.55,
 			AutomaticSize = Enum.AutomaticSize.Y,
-			ClipsDescendants = true,
-			ZIndex = 2
+			ClipsDescendants = false,
+			ZIndex = 4
 		}), {
-			Create("Frame", {
-				Name = "CardShadow",
-				ZIndex = 0,
-				Size = UDim2.new(1, 14, 1, 14),
-				Position = UDim2.new(0.5, 0, 0.5, 6),
-				AnchorPoint = Vector2.new(0.5, 0.5),
-				BackgroundColor3 = Color3.fromRGB(0, 0, 0),
-				BackgroundTransparency = 0.86,
-				BorderSizePixel = 0
-			}, {
-				Create("UICorner", {CornerRadius = UDim.new(0, 24)})
-			}),
-			Create("UIGradient", {
-				Rotation = 108,
-				Transparency = NumberSequence.new({
-					NumberSequenceKeypoint.new(0, 0.82),
-					NumberSequenceKeypoint.new(0.45, 0.9),
-					NumberSequenceKeypoint.new(1, 0.94)
-				}),
-				Color = ColorSequence.new({
-					ColorSequenceKeypoint.new(0, Acc:Lerp(Color3.fromRGB(255, 255, 255), 0.35)),
-					ColorSequenceKeypoint.new(0.4, MainC:Lerp(Acc, 0.08)),
-					ColorSequenceKeypoint.new(1, MainC)
-				})
-			}),
-			SetProps(MakeElement("Stroke", Acc, 1.45), {
-				Transparency = 0.48,
+			AddThemeObject(SetProps(MakeElement("Stroke"), {
+				Thickness = 1.15,
+				Transparency = 0.62,
 				Name = "CardStroke"
-			}),
+			}), "Stroke"),
 			Create("Frame", {
-				Name = "AccentRail",
-				Size = UDim2.new(0, 5, 0, 56),
-				Position = UDim2.new(0, 13, 0, 15),
+				Name = "AccentEdge",
+				Size = UDim2.new(0, 3, 1, -18),
+				Position = UDim2.new(0, 9, 0.5, 0),
+				AnchorPoint = Vector2.new(0, 0.5),
 				BackgroundColor3 = Acc,
 				BorderSizePixel = 0,
-				BackgroundTransparency = 0,
+				BackgroundTransparency = 0.08,
 				ZIndex = 2
 			}, {
-				Create("UICorner", {CornerRadius = UDim.new(1, 0)}),
-				Create("UIGradient", {
-					Rotation = 90,
-					Color = ColorSequence.new({
-						ColorSequenceKeypoint.new(0, Acc:Lerp(Color3.fromRGB(255, 255, 255), 0.2)),
-						ColorSequenceKeypoint.new(1, Acc:Lerp(MainC, 0.35))
-					})
-				}),
-				Create("UIStroke", {
-					Color = Acc:Lerp(Color3.fromRGB(255, 255, 255), 0.5),
-					Thickness = 1,
-					Transparency = 0.55
-				})
+				Create("UICorner", {CornerRadius = UDim.new(1, 0)})
 			}),
-			SetChildren(SetProps(MakeElement("RoundFrame", Th.Second, 0, 16), {
-				Size = UDim2.new(0, 52, 0, 52),
-				Position = UDim2.new(0, 24, 0, 17),
-				Name = "IconWrap",
-				BackgroundTransparency = 0.28,
-				ZIndex = 2
-			}), {
-				Create("UIGradient", {
-					Rotation = 135,
-					Color = ColorSequence.new({
-						ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 255, 255)),
-						ColorSequenceKeypoint.new(1, Th.Second)
-					}),
-					Transparency = NumberSequence.new({
-						NumberSequenceKeypoint.new(0, 0.88),
-						NumberSequenceKeypoint.new(1, 1)
-					})
-				}),
-				SetProps(MakeElement("Stroke", Acc, 1.2), {Transparency = 0.38, Name = "IconRing"}),
-				SetProps(MakeElement("Image", NotificationConfig.Image), {
-					Size = UDim2.new(0, 28, 0, 28),
-					Position = UDim2.new(0.5, -14, 0.5, -14),
-					ImageColor3 = Color3.fromRGB(252, 253, 255),
-					ImageTransparency = 0.02,
-					Name = "Icon",
-					ZIndex = 2
-				})
-			}),
-			SetChildren(SetProps(MakeElement("Label", "Hinweis", 11), {
-				Size = UDim2.new(0, 0, 0, 20),
-				AutomaticSize = Enum.AutomaticSize.X,
-				Position = UDim2.new(0, 88, 0, 16),
-				Font = Enum.Font.GothamBold,
-				TextSize = 11,
-				TextTransparency = 0.15,
-				TextXAlignment = Enum.TextXAlignment.Left,
-				Name = "Tag",
-				Text = string.upper(NotificationConfig.Name),
-				TextColor3 = Acc,
-				ZIndex = 2,
-				BackgroundColor3 = Acc,
-				BackgroundTransparency = 0.9
-			}), {
-				Create("UICorner", {CornerRadius = UDim.new(1, 0)}),
-				Create("UIPadding", {
-					PaddingLeft = UDim.new(0, 8),
-					PaddingRight = UDim.new(0, 8),
-					PaddingTop = UDim.new(0, 2),
-					PaddingBottom = UDim.new(0, 2)
-				})
-			}),
-			SetProps(MakeElement("Label", NotificationConfig.Name, 16), {
-				Size = UDim2.new(1, -100, 0, 28),
-				Position = UDim2.new(0, 88, 0, 38),
-				Font = Enum.Font.GothamBold,
-				TextSize = 19,
-				TextXAlignment = Enum.TextXAlignment.Left,
-				Name = "Title",
-				ZIndex = 2
-			}),
-			SetProps(MakeElement("Label", NotificationConfig.Content, 14), {
-				Size = UDim2.new(1, -100, 0, 0),
-				Position = UDim2.new(0, 88, 0, 68),
-				Font = Enum.Font.GothamMedium,
-				Name = "Content",
+			SetChildren(SetProps(MakeElement("TFrame"), {
+				Name = "Body",
+				Size = UDim2.new(1, 0, 0, 0),
 				AutomaticSize = Enum.AutomaticSize.Y,
-				TextColor3 = Th.TextDark,
-				TextTransparency = 0.08,
-				TextWrapped = true,
-				TextXAlignment = Enum.TextXAlignment.Left,
-				LineHeight = 1.18,
-				ZIndex = 2
-			}),
-			Create("Frame", {
-				Name = "ProgressBack",
-				Size = UDim2.new(1, -28, 0, 6),
-				Position = UDim2.new(0, 14, 1, -16),
-				BackgroundColor3 = Th.Divider,
-				BackgroundTransparency = 0.35,
-				BorderSizePixel = 0,
-				ZIndex = 2
-			}, {
-				Create("UICorner", {CornerRadius = UDim.new(1, 0)}),
-				Create("UIStroke", {
-					Color = Color3.fromRGB(255, 255, 255),
-					Transparency = 0.92,
-					Thickness = 1
+				ZIndex = 3
+			}), {
+				Create("UIPadding", {
+					PaddingLeft = UDim.new(0, 22),
+					PaddingRight = UDim.new(0, 14),
+					PaddingTop = UDim.new(0, 12),
+					PaddingBottom = UDim.new(0, 10)
 				}),
-				Create("Frame", {
-					Name = "ProgressFill",
-					Size = UDim2.new(1, 0, 1, 0),
-					BackgroundColor3 = Acc,
-					BorderSizePixel = 0,
-					BackgroundTransparency = 0.06,
-					ZIndex = 2
-				}, {
-					Create("UICorner", {CornerRadius = UDim.new(1, 0)}),
-					Create("UIGradient", {
-						Rotation = 0,
-						Color = ColorSequence.new({
-							ColorSequenceKeypoint.new(0, Acc:Lerp(Color3.fromRGB(255, 255, 255), 0.15)),
-							ColorSequenceKeypoint.new(0.55, Acc),
-							ColorSequenceKeypoint.new(1, Acc:Lerp(Color3.fromRGB(0, 0, 0), 0.15))
+				Create("UIListLayout", {
+					SortOrder = Enum.SortOrder.LayoutOrder,
+					Padding = UDim.new(0, 8),
+					HorizontalAlignment = Enum.HorizontalAlignment.Center
+				}),
+				SetChildren(SetProps(MakeElement("TFrame"), {
+					Name = "TopRow",
+					Size = UDim2.new(1, 0, 0, 0),
+					AutomaticSize = Enum.AutomaticSize.Y,
+					LayoutOrder = 1
+				}), {
+					Create("UIListLayout", {
+						FillDirection = Enum.FillDirection.Horizontal,
+						SortOrder = Enum.SortOrder.LayoutOrder,
+						Padding = UDim.new(0, 12),
+						VerticalAlignment = Enum.VerticalAlignment.Top
+					}),
+					SetChildren(SetProps(MakeElement("RoundFrame", Th.Second, 0, 12), {
+						Size = UDim2.new(0, 42, 0, 42),
+						BackgroundTransparency = 0.25,
+						LayoutOrder = 1,
+						Name = "IconWrap"
+					}), {
+						SetProps(MakeElement("Stroke", Acc, 1), {Transparency = 0.45, Name = "IconRing"}),
+						SetProps(MakeElement("Image", NotificationConfig.Image), {
+							Size = UDim2.new(0, 22, 0, 22),
+							Position = UDim2.new(0.5, -11, 0.5, -11),
+							ImageColor3 = Th.Text,
+							ImageTransparency = 0.02,
+							Name = "Icon"
 						})
 					}),
+					SetChildren(SetProps(MakeElement("TFrame"), {
+						Name = "TextCol",
+						Size = UDim2.new(1, -54, 0, 0),
+						AutomaticSize = Enum.AutomaticSize.Y,
+						LayoutOrder = 2
+					}), {
+						Create("UIListLayout", {
+							SortOrder = Enum.SortOrder.LayoutOrder,
+							Padding = UDim.new(0, 3),
+							HorizontalAlignment = Enum.HorizontalAlignment.Left
+						}),
+						AddThemeObject(SetProps(MakeElement("Label", string.upper(NotificationConfig.Name), 11), {
+							Size = UDim2.new(1, 0, 0, 14),
+							Font = Enum.Font.GothamBold,
+							TextSize = 11,
+							TextTransparency = 0.32,
+							TextXAlignment = Enum.TextXAlignment.Left,
+							Name = "Tag"
+						}), "Accent"),
+						AddThemeObject(SetProps(MakeElement("Label", NotificationConfig.Name, 16), {
+							Size = UDim2.new(1, 0, 0, 20),
+							Font = Enum.Font.GothamBold,
+							TextSize = 16,
+							TextXAlignment = Enum.TextXAlignment.Left,
+							Name = "Title"
+						}), "Text"),
+						AddThemeObject(SetProps(MakeElement("Label", NotificationConfig.Content, 14), {
+							Size = UDim2.new(1, 0, 0, 0),
+							AutomaticSize = Enum.AutomaticSize.Y,
+							Font = Enum.Font.GothamMedium,
+							TextWrapped = true,
+							TextXAlignment = Enum.TextXAlignment.Left,
+							LineHeight = 1.14,
+							Name = "Content"
+						}), "TextDark")
+					})
+				}),
+				SetChildren(SetProps(MakeElement("TFrame"), {
+					Name = "ProgressBack",
+					Size = UDim2.new(1, 0, 0, 4),
+					BackgroundTransparency = 1,
+					LayoutOrder = 2
+				}), {
 					Create("Frame", {
-						Name = "ProgressSheen",
-						Size = UDim2.new(0.35, 0, 1.4, 0),
-						Position = UDim2.new(0.15, 0, -0.2, 0),
-						BackgroundTransparency = 0.65,
-						BorderSizePixel = 0,
-						BackgroundColor3 = Color3.fromRGB(255, 255, 255),
-						ZIndex = 3
+						Name = "Track",
+						Size = UDim2.new(1, 0, 1, 0),
+						BackgroundColor3 = Th.Divider,
+						BackgroundTransparency = 0.2,
+						BorderSizePixel = 0
 					}, {
-						Create("UIGradient", {
-							Rotation = 90,
-							Transparency = NumberSequence.new({
-								NumberSequenceKeypoint.new(0, 1),
-								NumberSequenceKeypoint.new(0.5, 0.55),
-								NumberSequenceKeypoint.new(1, 1)
+						Create("UICorner", {CornerRadius = UDim.new(1, 0)}),
+						Create("Frame", {
+							Name = "ProgressFill",
+							Size = UDim2.new(1, 0, 1, 0),
+							BackgroundColor3 = Acc,
+							BorderSizePixel = 0,
+							BackgroundTransparency = 0.05
+						}, {
+							Create("UICorner", {CornerRadius = UDim.new(1, 0)}),
+							Create("UIGradient", {
+								Color = ColorSequence.new(
+									Acc:Lerp(Color3.fromRGB(255, 255, 255), 0.2),
+									Acc
+								)
 							})
 						})
 					})
 				})
-			}),
-			MakeElement("Padding", 24, 20, 22, 18)
+			})
 		})
 
-		NotificationFrame.ProgressBack.AnchorPoint = Vector2.new(0, 1)
-		NotificationFrame.ProgressBack.Position = UDim2.new(0, 14, 1, -14)
-
-		local iw = NotificationFrame:FindFirstChild("IconWrap")
-		if iw and iw:FindFirstChild("Icon") then
-			iw.Icon.Rotation = -6
-			TweenService:Create(iw.Icon, TweenInfo.new(0.65, Enum.EasingStyle.Elastic, Enum.EasingDirection.Out), {Rotation = 0}):Play()
+		local function findDeep(n)
+			return NotificationFrame:FindFirstChild(n, true)
 		end
 
-		TweenService:Create(NotificationFrame, TweenInfo.new(0.55, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
+		local icon = findDeep("Icon")
+		if icon then
+			icon.ImageTransparency = 0.35
+			TweenService:Create(icon, TweenInfo.new(0.45, Enum.EasingStyle.Quint), {ImageTransparency = 0.02}):Play()
+		end
+
+		TweenService:Create(NotificationFrame, TweenInfo.new(0.45, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
 			Position = UDim2.new(0, 0, 0, 0),
-			BackgroundTransparency = 0.12
+			BackgroundTransparency = 0.2
 		}):Play()
 
-		local fill = NotificationFrame.ProgressBack:FindFirstChild("ProgressFill")
+		local fill = findDeep("ProgressFill")
 		if fill then
 			fill.Size = UDim2.new(1, 0, 1, 0)
 			TweenService:Create(fill, TweenInfo.new(dur, Enum.EasingStyle.Linear), {Size = UDim2.new(0, 0, 1, 0)}):Play()
 		end
 
-		wait(dur - 0.35)
+		wait(dur - 0.32)
 
-		local wrap = NotificationFrame:FindFirstChild("IconWrap")
-		local wrapIcon = wrap and wrap:FindFirstChild("Icon")
-		if wrapIcon then
-			TweenService:Create(wrapIcon, TweenInfo.new(0.35, Enum.EasingStyle.Quint), {ImageTransparency = 1}):Play()
+		local tag = findDeep("Tag")
+		local title = findDeep("Title")
+		local content = findDeep("Content")
+		if icon then
+			TweenService:Create(icon, TweenInfo.new(0.32, Enum.EasingStyle.Quint), {ImageTransparency = 1}):Play()
 		end
+		local wrap = findDeep("IconWrap")
 		if wrap then
 			local ring = wrap:FindFirstChild("IconRing")
 			if ring and ring:IsA("UIStroke") then
-				TweenService:Create(ring, TweenInfo.new(0.4, Enum.EasingStyle.Quint), {Transparency = 1}):Play()
+				TweenService:Create(ring, TweenInfo.new(0.35, Enum.EasingStyle.Quint), {Transparency = 1}):Play()
 			end
 		end
-		local ar = NotificationFrame:FindFirstChild("AccentRail")
-		if ar then
-			TweenService:Create(ar, TweenInfo.new(0.4, Enum.EasingStyle.Quint), {BackgroundTransparency = 1}):Play()
-			local ars = ar:FindFirstChildOfClass("UIStroke")
-			if ars then
-				TweenService:Create(ars, TweenInfo.new(0.4, Enum.EasingStyle.Quint), {Transparency = 1}):Play()
-			end
+		local ae = NotificationFrame:FindFirstChild("AccentEdge")
+		if ae then
+			TweenService:Create(ae, TweenInfo.new(0.35, Enum.EasingStyle.Quint), {BackgroundTransparency = 1}):Play()
 		end
-		local sh = NotificationFrame:FindFirstChild("CardShadow")
-		if sh then
-			TweenService:Create(sh, TweenInfo.new(0.45, Enum.EasingStyle.Quint), {BackgroundTransparency = 1}):Play()
+		if title then
+			TweenService:Create(title, TweenInfo.new(0.38, Enum.EasingStyle.Quint), {TextTransparency = 1}):Play()
 		end
-		TweenService:Create(NotificationFrame.Title, TweenInfo.new(0.45, Enum.EasingStyle.Quint), {TextTransparency = 1}):Play()
-		TweenService:Create(NotificationFrame.Tag, TweenInfo.new(0.45, Enum.EasingStyle.Quint), {TextTransparency = 1, BackgroundTransparency = 1}):Play()
-		TweenService:Create(NotificationFrame.Content, TweenInfo.new(0.45, Enum.EasingStyle.Quint), {TextTransparency = 1}):Play()
-		TweenService:Create(NotificationFrame, TweenInfo.new(0.5, Enum.EasingStyle.Quint), {BackgroundTransparency = 1}):Play()
+		if tag then
+			TweenService:Create(tag, TweenInfo.new(0.38, Enum.EasingStyle.Quint), {TextTransparency = 1}):Play()
+		end
+		if content then
+			TweenService:Create(content, TweenInfo.new(0.38, Enum.EasingStyle.Quint), {TextTransparency = 1}):Play()
+		end
+		TweenService:Create(NotificationFrame, TweenInfo.new(0.45, Enum.EasingStyle.Quint), {BackgroundTransparency = 1}):Play()
 		local cs = NotificationFrame:FindFirstChild("CardStroke")
 		if cs and cs:IsA("UIStroke") then
-			TweenService:Create(cs, TweenInfo.new(0.5, Enum.EasingStyle.Quint), {Transparency = 1}):Play()
+			TweenService:Create(cs, TweenInfo.new(0.45, Enum.EasingStyle.Quint), {Transparency = 1}):Play()
 		end
-		if NotificationFrame.ProgressBack then
-			TweenService:Create(NotificationFrame.ProgressBack, TweenInfo.new(0.35, Enum.EasingStyle.Quint), {BackgroundTransparency = 1}):Play()
-			local pf = NotificationFrame.ProgressBack:FindFirstChild("ProgressFill")
-			if pf then
-				TweenService:Create(pf, TweenInfo.new(0.3, Enum.EasingStyle.Quint), {BackgroundTransparency = 1}):Play()
+		local pb = findDeep("ProgressBack")
+		if pb then
+			local tr = pb:FindFirstChild("Track")
+			if tr then
+				TweenService:Create(tr, TweenInfo.new(0.3, Enum.EasingStyle.Quint), {BackgroundTransparency = 1}):Play()
+			end
+			if fill then
+				TweenService:Create(fill, TweenInfo.new(0.28, Enum.EasingStyle.Quint), {BackgroundTransparency = 1}):Play()
 			end
 		end
-		wait(0.15)
+		wait(0.12)
 
-		TweenService:Create(NotificationFrame, TweenInfo.new(0.55, Enum.EasingStyle.Quint, Enum.EasingDirection.In), {
-			Position = UDim2.new(1, 100, 0, 0)
+		TweenService:Create(NotificationFrame, TweenInfo.new(0.48, Enum.EasingStyle.Quint, Enum.EasingDirection.In), {
+			Position = UDim2.new(1, 90, 0, 0)
 		}):Play()
-		wait(0.6)
+		wait(0.52)
 		NotificationParent:Destroy()
 	end)
 end    
@@ -707,6 +748,8 @@ function OrionLib:MakeWindow(WindowConfig)
 	WindowConfig.ConfigFolder = WindowConfig.ConfigFolder or WindowConfig.Name
 	WindowConfig.SaveConfig = WindowConfig.SaveConfig or false
 	WindowConfig.HidePremium = WindowConfig.HidePremium or false
+	WindowConfig.Premium = WindowConfig.Premium or false
+	OrionLib.PremiumUnlocked = WindowConfig.Premium == true
 	if WindowConfig.IntroEnabled == nil then
 		WindowConfig.IntroEnabled = true
 	end
@@ -729,7 +772,8 @@ function OrionLib:MakeWindow(WindowConfig)
 	local TabSearchRegistry = {}
 	local SelectedTabButton = nil
 	local SidebarW = 226
-	local WinAccent = OrionLib.Themes[OrionLib.SelectedTheme].Accent
+	local TabSearchInputRef = nil
+	local PremiumCrownRef = nil
 
 	local TabHolder = AddThemeObject(SetChildren(SetProps(MakeElement("ScrollFrame", Color3.fromRGB(255, 255, 255), 2), {
 		Size = UDim2.new(1, 0, 1, -112),
@@ -807,15 +851,14 @@ function OrionLib:MakeWindow(WindowConfig)
 			Position = UDim2.new(0, 0, 0, 10),
 			Name = "SidebarHeader"
 		}), {
-			Create("Frame", {
+			AddThemeObject(SetProps(Create("Frame", {
 				Size = UDim2.new(0, 3, 0, 14),
 				Position = UDim2.new(0, 14, 0.5, -7),
-				BackgroundColor3 = WinAccent,
 				BackgroundTransparency = 0.2,
 				BorderSizePixel = 0
 			}, {
 				Create("UICorner", {CornerRadius = UDim.new(1, 0)})
-			}),
+			}), {Name = "SidebarAccentStripe"}), "Accent"),
 			AddThemeObject(SetProps(MakeElement("Label", "Navigation", 12), {
 				Size = UDim2.new(1, -36, 1, 0),
 				Position = UDim2.new(0, 24, 0, 0),
@@ -843,28 +886,76 @@ function OrionLib:MakeWindow(WindowConfig)
 				Name = "BrandTitle",
 				TextXAlignment = Enum.TextXAlignment.Left
 			}), "Text"),
-			SetProps(MakeElement("Label", WindowConfig.BrandTag, 11), {
+			AddThemeObject(SetProps(MakeElement("Label", WindowConfig.BrandTag, 11), {
 				Size = UDim2.new(1, -28, 0, 28),
 				Position = UDim2.new(0, 14, 0, 30),
 				Font = Enum.Font.GothamMedium,
-				TextColor3 = WinAccent,
 				TextTransparency = 0.12,
 				TextWrapped = true,
 				Visible = WindowConfig.BrandTag ~= "",
 				Name = "BrandTag",
 				TextXAlignment = Enum.TextXAlignment.Left,
 				TextYAlignment = Enum.TextYAlignment.Top
-			})
+			}), "Accent")
 		}),
 	}), "Second")
 
 	local WindowName = AddThemeObject(SetProps(MakeElement("Label", WindowConfig.Name, 14), {
-		Size = UDim2.new(1, -320, 2, 0),
+		Size = UDim2.new(1, -420, 2, 0),
 		Position = UDim2.new(0, 28, 0, -26),
 		Font = Enum.Font.GothamBold,
 		TextSize = 18,
 		TextTruncate = Enum.TextTruncate.AtEnd
 	}), "Text")
+
+	local PremiumCrown = SetProps(MakeElement("Image", "rbxassetid://3944688395"), {
+		Size = UDim2.new(0, 22, 0, 22),
+		Position = UDim2.new(0, 26, 0, 16),
+		BackgroundTransparency = 1,
+		Name = "PremiumCrown",
+		Visible = OrionLib.PremiumUnlocked,
+		ImageTransparency = 0.08,
+		ZIndex = 5
+	})
+	PremiumCrownRef = PremiumCrown
+	AddThemeObject(PremiumCrown, "Accent2")
+
+	local ThemeClick = SetProps(MakeElement("Button"), {
+		Size = UDim2.new(1, 0, 1, 0),
+		BackgroundTransparency = 1,
+		Name = "ThemeHit"
+	})
+
+	local ThemePickerBtn = AddThemeObject(SetChildren(SetProps(MakeElement("RoundFrame", Color3.fromRGB(255, 255, 255), 0, 18), {
+		Size = UDim2.new(0, 96, 0, 38),
+		Position = UDim2.new(1, -408, 0, 8),
+		AnchorPoint = Vector2.new(1, 0),
+		Name = "ThemePickerBtn",
+		BackgroundTransparency = 0.42,
+		ZIndex = 6
+	}), {
+		AddThemeObject(SetProps(MakeElement("Stroke"), {
+			Transparency = 0.86,
+			Thickness = 1.05,
+			LineJoinMode = Enum.LineJoinMode.Round
+		}), "Stroke"),
+		AddThemeObject(SetProps(MakeElement("Image", "rbxassetid://6031094677"), {
+			Size = UDim2.new(0, 16, 0, 16),
+			Position = UDim2.new(0, 12, 0.5, -8),
+			ImageTransparency = 0.25,
+			Name = "ThemeIco"
+		}), "Accent"),
+		AddThemeObject(SetProps(MakeElement("Label", "Themes", 12), {
+			Size = UDim2.new(1, -32, 1, 0),
+			Position = UDim2.new(0, 30, 0, 0),
+			Font = Enum.Font.GothamBold,
+			TextSize = 13,
+			TextXAlignment = Enum.TextXAlignment.Left,
+			TextTransparency = 0.06,
+			Name = "ThemeLbl"
+		}), "Text"),
+		ThemeClick
+	}), "Second")
 
 	local WindowTopBarLine = AddThemeObject(SetProps(MakeElement("Frame"), {
 		Size = UDim2.new(1, 0, 0, 1),
@@ -893,8 +984,10 @@ function OrionLib:MakeWindow(WindowConfig)
 			Size = UDim2.new(1, 0, 0, 54),
 			Name = "TopBar"
 		}), {
+			PremiumCrown,
 			WindowName,
 			WindowTopBarLine,
+			ThemePickerBtn,
 			AddThemeObject(SetChildren(SetProps(MakeElement("RoundFrame", Color3.fromRGB(255, 255, 255), 0, 18), {
 				Size = UDim2.new(0, 196, 0, 38),
 				Position = UDim2.new(1, -304, 0, 8),
@@ -913,21 +1006,25 @@ function OrionLib:MakeWindow(WindowConfig)
 					ImageTransparency = 0.32,
 					Name = "SearchIco"
 				}), "TextDark"),
-				Create("TextBox", {
-					Name = "TabSearchInput",
-					Size = UDim2.new(1, -44, 0, 26),
-					Position = UDim2.new(0, 36, 0.5, -13),
-					BackgroundTransparency = 1,
-					Text = "",
-					PlaceholderText = "Tabs durchsuchen…",
-					TextColor3 = OrionLib.Themes[OrionLib.SelectedTheme].Text,
-					PlaceholderColor3 = OrionLib.Themes[OrionLib.SelectedTheme].TextDark,
-					TextSize = 14,
-					Font = Enum.Font.GothamMedium,
-					ClearTextOnFocus = false,
-					TextXAlignment = Enum.TextXAlignment.Left,
-					TextTruncate = Enum.TextTruncate.AtEnd
-				})
+				(function()
+					local tb = Create("TextBox", {
+						Name = "TabSearchInput",
+						Size = UDim2.new(1, -44, 0, 26),
+						Position = UDim2.new(0, 36, 0.5, -13),
+						BackgroundTransparency = 1,
+						Text = "",
+						PlaceholderText = "Tabs durchsuchen…",
+						TextColor3 = OrionLib.Themes[OrionLib.SelectedTheme].Text,
+						PlaceholderColor3 = OrionLib.Themes[OrionLib.SelectedTheme].TextDark,
+						TextSize = 14,
+						Font = Enum.Font.GothamMedium,
+						ClearTextOnFocus = false,
+						TextXAlignment = Enum.TextXAlignment.Left,
+						TextTruncate = Enum.TextTruncate.AtEnd
+					})
+					TabSearchInputRef = tb
+					return tb
+				end)()
 			}), "Second"),
 			AddThemeObject(SetChildren(SetProps(MakeElement("RoundFrame", Color3.fromRGB(255, 255, 255), 0, 18), {
 				Size = UDim2.new(0, 88, 0, 38),
@@ -956,6 +1053,198 @@ function OrionLib:MakeWindow(WindowConfig)
 	MainWindow.BackgroundTransparency = 0.14
 	WindowStuff.BackgroundTransparency = 0.36
 
+	local ThemeScroll = SetChildren(SetProps(MakeElement("ScrollFrame", Color3.fromRGB(255, 255, 255), 2), {
+		Name = "ThemeScroll",
+		Size = UDim2.new(1, -24, 0, 198),
+		Position = UDim2.new(0, 12, 0, 40),
+		BackgroundTransparency = 1,
+		BorderSizePixel = 0,
+		ScrollBarThickness = 3,
+		ScrollBarImageTransparency = 0.5,
+		CanvasSize = UDim2.new(0, 0, 0, 0),
+		ScrollingDirection = Enum.ScrollingDirection.Y
+	}), {
+		Create("UIListLayout", {
+			SortOrder = Enum.SortOrder.LayoutOrder,
+			Padding = UDim.new(0, 6)
+		})
+	})
+
+	local ThemeHint = AddThemeObject(SetProps(MakeElement("Label", "", 11), {
+		Size = UDim2.new(1, -24, 0, 28),
+		Position = UDim2.new(0, 12, 1, -34),
+		Font = Enum.Font.GothamMedium,
+		TextSize = 11,
+		TextTransparency = 0.35,
+		TextWrapped = true,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		Name = "ThemeHint"
+	}), "TextDark")
+
+	local ThemeDropdown = AddThemeObject(SetChildren(SetProps(MakeElement("RoundFrame", Color3.fromRGB(255, 255, 255), 0, 16), {
+		Parent = MainWindow,
+		Name = "ThemeDropdown",
+		Size = UDim2.new(0, 228, 0, 278),
+		Position = UDim2.new(1, -14, 0, 50),
+		AnchorPoint = Vector2.new(1, 0),
+		Visible = false,
+		ZIndex = 35,
+		BackgroundTransparency = 0.06,
+		ClipsDescendants = true
+	}), {
+		AddThemeObject(SetProps(MakeElement("Stroke"), {Transparency = 0.8, Thickness = 1.08}), "Stroke"),
+		AddThemeObject(SetProps(MakeElement("Label", "Erscheinungsbild", 14), {
+			Size = UDim2.new(1, -20, 0, 22),
+			Position = UDim2.new(0, 14, 0, 10),
+			Font = Enum.Font.GothamBold,
+			TextSize = 14,
+			TextXAlignment = Enum.TextXAlignment.Left,
+			Name = "ThemeMenuTitle"
+		}), "Text"),
+		ThemeScroll,
+		ThemeHint
+	}), "Second")
+
+	local ThemeDropdownOpen = false
+	local function refreshThemeHint()
+		if OrionLib.PremiumUnlocked then
+			ThemeHint.Text = ""
+			ThemeHint.Visible = false
+		else
+			ThemeHint.Text = "Theme „Aurum“ ist mit Premium freigeschaltet."
+			ThemeHint.Visible = true
+		end
+	end
+	refreshThemeHint()
+
+	local function rebuildThemeRows()
+		local kill = {}
+		for _, c in ipairs(ThemeScroll:GetChildren()) do
+			if not c:IsA("UIListLayout") then
+				table.insert(kill, c)
+			end
+		end
+		for _, c in ipairs(kill) do
+			c:Destroy()
+		end
+		local ThNow = OrionLib.Themes[OrionLib.SelectedTheme]
+		for order, key in ipairs(OrionLib.ThemeOrder) do
+			local pal = OrionLib.Themes[key]
+			local locked = pal.PremiumOnly and not OrionLib.PremiumUnlocked
+			local display = pal.DisplayName or key
+			local active = OrionLib.SelectedTheme == key
+			local row = SetChildren(SetProps(MakeElement("Button"), {
+				Size = UDim2.new(1, 0, 0, 36),
+				BackgroundColor3 = ThNow.Second,
+				BackgroundTransparency = locked and 0.58 or (active and 0.28 or 0.48),
+				Name = "ThemeRow_" .. key,
+				LayoutOrder = order,
+				ZIndex = 2
+			}), {
+				Create("UICorner", {CornerRadius = UDim.new(0, 10)}),
+				(function()
+					local st = Create("UIStroke", {
+						Color = active and pal.Accent or ThNow.Stroke,
+						Thickness = active and 1.15 or 1.05,
+						Transparency = active and 0.48 or 0.88
+					})
+					pcall(function()
+						st.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+					end)
+					return st
+				end)(),
+				Create("Frame", {
+					Size = UDim2.new(0, 14, 0, 14),
+					Position = UDim2.new(0, 12, 0.5, -7),
+					BackgroundColor3 = pal.Accent,
+					BorderSizePixel = 0
+				}, {
+					Create("UICorner", {CornerRadius = UDim.new(1, 0)}),
+					Create("UIStroke", {
+						Color = Color3.fromRGB(255, 255, 255),
+						Transparency = 0.65,
+						Thickness = 1
+					})
+				}),
+				SetProps(MakeElement("Label", display .. (active and "  ✓" or ""), 13), {
+					Size = UDim2.new(1, -70, 1, 0),
+					Position = UDim2.new(0, 34, 0, 0),
+					Font = Enum.Font.GothamBold,
+					TextSize = 13,
+					TextXAlignment = Enum.TextXAlignment.Left,
+					TextTransparency = locked and 0.45 or 0.04,
+					TextColor3 = ThNow.Text
+				}),
+				SetProps(MakeElement("Image", "rbxassetid://3926305901"), {
+					Size = UDim2.new(0, 16, 0, 16),
+					Position = UDim2.new(1, -28, 0.5, -8),
+					BackgroundTransparency = 1,
+					ImageTransparency = locked and 0.15 or 1,
+					Name = "LockIco"
+				})
+			})
+			row.Parent = ThemeScroll
+			AddConnection(row.MouseButton1Click, function()
+				if locked then
+					return
+				end
+				if OrionLib:SetTheme(key) then
+					ThemeDropdownOpen = false
+					ThemeDropdown.Visible = false
+					rebuildThemeRows()
+				end
+			end)
+			local baseT = locked and 0.58 or (active and 0.28 or 0.48)
+			AddConnection(row.MouseEnter, function()
+				if not locked then
+					TweenService:Create(row, TweenInfo.new(0.15, Enum.EasingStyle.Quint), {BackgroundTransparency = math.max(0.14, baseT - 0.14)}):Play()
+				end
+			end)
+			AddConnection(row.MouseLeave, function()
+				if not locked then
+					TweenService:Create(row, TweenInfo.new(0.15, Enum.EasingStyle.Quint), {BackgroundTransparency = baseT}):Play()
+				end
+			end)
+		end
+		task.defer(function()
+			local lay = ThemeScroll:FindFirstChildOfClass("UIListLayout")
+			if lay then
+				ThemeScroll.CanvasSize = UDim2.new(0, 0, 0, lay.AbsoluteContentSize.Y + 12)
+			end
+		end)
+	end
+	rebuildThemeRows()
+
+	AddConnection(ThemeClick.MouseButton1Click, function()
+		ThemeDropdownOpen = not ThemeDropdownOpen
+		ThemeDropdown.Visible = ThemeDropdownOpen
+		if ThemeDropdownOpen then
+			rebuildThemeRows()
+			refreshThemeHint()
+		end
+	end)
+
+	table.insert(OrionLib._ThemeListeners, function()
+		local T = OrionLib.Themes[OrionLib.SelectedTheme]
+		if TabSearchInputRef and TabSearchInputRef.Parent then
+			TabSearchInputRef.TextColor3 = T.Text
+			TabSearchInputRef.PlaceholderColor3 = T.TextDark
+		end
+		local ch = MainWindow:FindFirstChild("WindowChrome", true)
+		if ch and ch:IsA("UIStroke") then
+			if OrionLib.SelectedTheme == "Aurum" then
+				ch.Transparency = 0.5
+				ch.Color = T.Accent2
+				ch.Thickness = 1.35
+			else
+				ch.Transparency = 0.78
+				ch.Color = T.Accent
+				ch.Thickness = 1.2
+			end
+		end
+		rebuildThemeRows()
+	end)
+
 	if WindowConfig.ShowIcon then
 		WindowName.Position = UDim2.new(0, 54, 0, -26)
 		local WindowIcon = SetProps(MakeElement("Image", WindowConfig.Icon), {
@@ -963,6 +1252,9 @@ function OrionLib:MakeWindow(WindowConfig)
 			Position = UDim2.new(0, 25, 0, 15)
 		})
 		WindowIcon.Parent = MainWindow.TopBar
+		if OrionLib.PremiumUnlocked and PremiumCrownRef then
+			PremiumCrownRef.Position = UDim2.new(0, 54, 0, 16)
+		end
 	end	
 
 	local function ApplyTabSearchFilter()
@@ -1599,42 +1891,34 @@ function OrionLib:MakeWindow(WindowConfig)
 					return s
 				end
 
-				local TrackShadow = Create("Frame", {
-					Name = "TrackShadow",
-					Size = UDim2.new(1, -40, 0, 18),
-					Position = UDim2.new(0, 22, 0, 102),
-					BackgroundColor3 = Color3.fromRGB(0, 0, 0),
-					BackgroundTransparency = 0.82,
-					BorderSizePixel = 0,
-					ZIndex = 1
-				}, {Create("UICorner", {CornerRadius = UDim.new(1, 0)})})
-
 				local SliderBar = SetChildren(SetProps(MakeElement("RoundFrame", Theme.Divider, 0, 1), {
-					Size = UDim2.new(1, -40, 0, 16),
-					Position = UDim2.new(0, 20, 0, 100),
-					BackgroundTransparency = 0.5,
+					Size = UDim2.new(1, -32, 0, 10),
+					Position = UDim2.new(0, 16, 0, 52),
+					BackgroundTransparency = 0.42,
 					Name = "SliderBar",
 					ZIndex = 2
 				}), {
-					AddThemeObject(SetProps(MakeElement("Stroke"), {Transparency = 0.86, Thickness = 1.05}), "Stroke")
+					AddThemeObject(SetProps(MakeElement("Stroke"), {Transparency = 0.9, Thickness = 1}), "Stroke")
 				})
 
 				local SliderDrag = SetChildren(SetProps(MakeElement("RoundFrame", SliderConfig.Color, 0, 1), {
 					Size = UDim2.fromScale(0, 1),
-					BackgroundTransparency = 0.06,
+					BackgroundTransparency = 0.04,
 					ClipsDescendants = true,
 					ZIndex = 2
 				}), {
 					Create("UIGradient", {
-						Rotation = 0,
-						Color = ColorSequence.new(SliderConfig.Color, SliderConfig.Color:Lerp(Color3.fromRGB(255, 255, 255), 0.35))
+						Color = ColorSequence.new(
+							SliderConfig.Color:Lerp(Color3.fromRGB(255, 255, 255), 0.28),
+							SliderConfig.Color
+						)
 					})
 				})
 				SliderDrag.Parent = SliderBar
 
 				local Thumb = Create("Frame", {
 					Name = "Thumb",
-					Size = UDim2.new(0, 22, 0, 22),
+					Size = UDim2.new(0, 16, 0, 16),
 					AnchorPoint = Vector2.new(0.5, 0.5),
 					Position = UDim2.new(0, 0, 0.5, 0),
 					BackgroundColor3 = Color3.fromRGB(255, 255, 255),
@@ -1642,60 +1926,63 @@ function OrionLib:MakeWindow(WindowConfig)
 					ZIndex = 4
 				}, {
 					Create("UICorner", {CornerRadius = UDim.new(1, 0)}),
-					Create("UIStroke", {Color = SliderConfig.Color, Thickness = 2, Transparency = 0.25}),
-					Create("Frame", {
-						Size = UDim2.new(0.45, 0, 0.45, 0),
-						Position = UDim2.new(0.275, 0, 0.275, 0),
-						BackgroundColor3 = SliderConfig.Color,
-						BorderSizePixel = 0,
-						BackgroundTransparency = 0.2
-					}, {Create("UICorner", {CornerRadius = UDim.new(1, 0)})})
+					Create("UIStroke", {Color = SliderConfig.Color, Thickness = 1.5, Transparency = 0.2})
 				})
 				Thumb.Parent = SliderBar
 
-				local ValueBig = AddThemeObject(SetProps(MakeElement("Label", formatVal(Slider.Value), 22), {
-					Size = UDim2.new(1, -40, 0, 36),
-					Position = UDim2.new(0, 20, 0, 52),
-					Font = Enum.Font.GothamBold,
-					TextSize = 26,
-					TextXAlignment = Enum.TextXAlignment.Left,
-					TextTransparency = 0.02,
-					Name = "ValueBig"
-				}), "Text")
+				local ValueBadge = AddThemeObject(SetChildren(SetProps(MakeElement("RoundFrame", Theme.Main, 0, 10), {
+					Size = UDim2.new(0, 72, 0, 26),
+					Position = UDim2.new(1, -16, 0, 12),
+					AnchorPoint = Vector2.new(1, 0),
+					BackgroundTransparency = 0.5,
+					Name = "ValueBadge"
+				}), {
+					AddThemeObject(SetProps(MakeElement("Stroke"), {
+						Transparency = 0.82,
+						Thickness = 1,
+						Color = SliderConfig.Color
+					}), "Stroke"),
+					SetProps(MakeElement("Label", formatVal(Slider.Value), 13), {
+						Size = UDim2.new(1, -8, 1, 0),
+						Position = UDim2.new(0, 4, 0, 0),
+						Font = Enum.Font.GothamBold,
+						TextSize = 13,
+						TextXAlignment = Enum.TextXAlignment.Center,
+						Name = "ValueText",
+						TextColor3 = SliderConfig.Color
+					})
+				}), "Second")
 
-				local RangeLbl = AddThemeObject(SetProps(MakeElement("Label", tostring(SliderConfig.Min) .. " → " .. tostring(SliderConfig.Max), 11), {
-					Size = UDim2.new(1, -40, 0, 16),
-					Position = UDim2.new(0, 20, 0, 86),
-					Font = Enum.Font.GothamMedium,
-					TextSize = 12,
-					TextTransparency = 0.4,
-					TextXAlignment = Enum.TextXAlignment.Left,
-					Name = "RangeLbl"
-				}), "TextDark")
-
-				local SliderFrame = AddThemeObject(SetChildren(SetProps(MakeElement("RoundFrame", Color3.fromRGB(255, 255, 255), 0, 18), {
-					Size = UDim2.new(1, 0, 0, 134),
-					BackgroundTransparency = 0.45,
+				local SliderFrame = AddThemeObject(SetChildren(SetProps(MakeElement("RoundFrame", Color3.fromRGB(255, 255, 255), 0, 16), {
+					Size = UDim2.new(1, 0, 0, 86),
+					BackgroundTransparency = 0.46,
 					Parent = ItemParent
 				}), {
-					AddThemeObject(SetProps(MakeElement("Stroke"), {Transparency = 0.88, Thickness = 1.08}), "Stroke"),
+					AddThemeObject(SetProps(MakeElement("Stroke"), {Transparency = 0.88, Thickness = 1.05}), "Stroke"),
 					Create("Frame", {
-						Size = UDim2.new(0, 4, 0.55, 0),
-						Position = UDim2.new(0, 12, 0.2, 0),
+						Size = UDim2.new(0, 3, 0, 36),
+						Position = UDim2.new(0, 12, 0, 14),
 						BackgroundColor3 = SliderConfig.Color,
-						BackgroundTransparency = 0.25,
+						BackgroundTransparency = 0.2,
 						BorderSizePixel = 0
 					}, {Create("UICorner", {CornerRadius = UDim.new(1, 0)})}),
 					AddThemeObject(SetProps(MakeElement("Label", SliderConfig.Name, 15), {
-						Size = UDim2.new(1, -48, 0, 24),
-						Position = UDim2.new(0, 24, 0, 14),
+						Size = UDim2.new(1, -120, 0, 22),
+						Position = UDim2.new(0, 22, 0, 14),
 						Font = Enum.Font.GothamBold,
 						TextSize = 15,
 						Name = "Content"
 					}), "Text"),
-					ValueBig,
-					RangeLbl,
-					TrackShadow,
+					AddThemeObject(SetProps(MakeElement("Label", tostring(SliderConfig.Min) .. " — " .. tostring(SliderConfig.Max), 11), {
+						Size = UDim2.new(1, -120, 0, 14),
+						Position = UDim2.new(0, 22, 0, 34),
+						Font = Enum.Font.GothamMedium,
+						TextSize = 11,
+						TextTransparency = 0.38,
+						TextXAlignment = Enum.TextXAlignment.Left,
+						Name = "RangeLbl"
+					}), "TextDark"),
+					ValueBadge,
 					SliderBar
 				}), "Second")
 
@@ -1728,9 +2015,12 @@ function OrionLib:MakeWindow(WindowConfig)
 					self.Value = math.clamp(Round(Value, SliderConfig.Increment), SliderConfig.Min, SliderConfig.Max)
 					local span = math.max(SliderConfig.Max - SliderConfig.Min, 1e-6)
 					local scale = (self.Value - SliderConfig.Min) / span
-					TweenService:Create(SliderDrag, TweenInfo.new(0.12, Enum.EasingStyle.Quint), {Size = UDim2.fromScale(scale, 1)}):Play()
+					TweenService:Create(SliderDrag, TweenInfo.new(0.1, Enum.EasingStyle.Quint), {Size = UDim2.fromScale(scale, 1)}):Play()
 					updateThumb(scale)
-					ValueBig.Text = formatVal(self.Value)
+					local txt = formatVal(self.Value)
+					ValueBadge.ValueText.Text = txt
+					local tw = math.clamp(ValueBadge.ValueText.TextBounds.X + 22, 56, 160)
+					ValueBadge.Size = UDim2.new(0, tw, 0, 26)
 					SliderConfig.Callback(self.Value)
 				end
 
@@ -2634,7 +2924,7 @@ function OrionLib:MakeWindow(WindowConfig)
 					Position = UDim2.new(0, 150, 0, 112),
 					Font = Enum.Font.GothamBold
 				}), "Text"),
-				AddThemeObject(SetProps(MakeElement("Label", "This part of the script is locked to Sirius Premium users. Purchase Premium in the Discord server (discord.gg/sirius)", 12), {
+				AddThemeObject(SetProps(MakeElement("Label", "Dieser Tab ist Premium-geschützt. Mehr dazu im Discord (z. B. discord.gg/pX5a9DHwmc).", 12), {
 					Size = UDim2.new(1, -200, 0, 14),
 					Position = UDim2.new(0, 150, 0, 138),
 					TextWrapped = true,
