@@ -2895,7 +2895,7 @@ function OrionLib:MakeWindow(WindowConfig)
 			ElementFunction[i] = v 
 		end
 
-		if TabConfig.PremiumOnly then
+		if TabConfig.PremiumOnly and not OrionLib.PremiumUnlocked then
 			for i, v in next, ElementFunction do
 				ElementFunction[i] = function() end
 			end    
