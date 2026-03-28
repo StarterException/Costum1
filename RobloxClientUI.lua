@@ -14,6 +14,10 @@ local OrionLib = {
 	Connections = {},
 	Flags = {},
 	_ThemeListeners = {},
+	_PremiumListeners = {},
+	_PremiumVerifyFn = nil,
+	_PremiumKeyList = nil,
+	_PremiumPersistPath = nil,
 	PremiumUnlocked = false,
 	Themes = {
 		Default = {
@@ -71,9 +75,54 @@ local OrionLib = {
 			Accent = Color3.fromRGB(167, 139, 250),
 			Accent2 = Color3.fromRGB(210, 190, 255)
 		},
+		Rose = {
+			DisplayName = "Rose",
+			Main = Color3.fromRGB(14, 8, 12),
+			Second = Color3.fromRGB(24, 14, 20),
+			Stroke = Color3.fromRGB(68, 40, 56),
+			Divider = Color3.fromRGB(40, 24, 34),
+			Text = Color3.fromRGB(255, 248, 252),
+			TextDark = Color3.fromRGB(200, 170, 188),
+			Accent = Color3.fromRGB(244, 114, 182),
+			Accent2 = Color3.fromRGB(251, 207, 232)
+		},
+		Slate = {
+			DisplayName = "Slate",
+			Main = Color3.fromRGB(10, 12, 16),
+			Second = Color3.fromRGB(20, 22, 28),
+			Stroke = Color3.fromRGB(50, 54, 64),
+			Divider = Color3.fromRGB(32, 36, 44),
+			Text = Color3.fromRGB(248, 250, 252),
+			TextDark = Color3.fromRGB(130, 140, 158),
+			Accent = Color3.fromRGB(148, 163, 184),
+			Accent2 = Color3.fromRGB(203, 213, 225)
+		},
+		Cyber = {
+			DisplayName = "Cyber",
+			Main = Color3.fromRGB(6, 8, 18),
+			Second = Color3.fromRGB(12, 14, 32),
+			Stroke = Color3.fromRGB(40, 48, 92),
+			Divider = Color3.fromRGB(22, 28, 58),
+			Text = Color3.fromRGB(236, 254, 255),
+			TextDark = Color3.fromRGB(120, 200, 220),
+			Accent = Color3.fromRGB(34, 211, 238),
+			Accent2 = Color3.fromRGB(168, 85, 247)
+		},
+		Sunset = {
+			DisplayName = "Sunset",
+			Main = Color3.fromRGB(16, 10, 8),
+			Second = Color3.fromRGB(28, 18, 14),
+			Stroke = Color3.fromRGB(78, 48, 38),
+			Divider = Color3.fromRGB(48, 30, 24),
+			Text = Color3.fromRGB(255, 247, 240),
+			TextDark = Color3.fromRGB(210, 170, 150),
+			Accent = Color3.fromRGB(251, 146, 60),
+			Accent2 = Color3.fromRGB(253, 224, 71)
+		},
 		Aurum = {
 			DisplayName = "Aurum",
 			PremiumOnly = true,
+			LuxChrome = true,
 			Main = Color3.fromRGB(12, 10, 6),
 			Second = Color3.fromRGB(22, 18, 10),
 			Stroke = Color3.fromRGB(92, 72, 38),
@@ -82,9 +131,52 @@ local OrionLib = {
 			TextDark = Color3.fromRGB(210, 190, 150),
 			Accent = Color3.fromRGB(250, 204, 21),
 			Accent2 = Color3.fromRGB(255, 230, 120)
+		},
+		RubyLux = {
+			DisplayName = "Ruby Luxe",
+			PremiumOnly = true,
+			LuxChrome = true,
+			Main = Color3.fromRGB(14, 6, 10),
+			Second = Color3.fromRGB(28, 10, 16),
+			Stroke = Color3.fromRGB(92, 32, 48),
+			Divider = Color3.fromRGB(52, 18, 28),
+			Text = Color3.fromRGB(255, 242, 245),
+			TextDark = Color3.fromRGB(220, 160, 175),
+			Accent = Color3.fromRGB(255, 77, 109),
+			Accent2 = Color3.fromRGB(255, 200, 120)
+		},
+		Nexus = {
+			DisplayName = "Nexus",
+			PremiumOnly = true,
+			LuxChrome = true,
+			Main = Color3.fromRGB(4, 8, 14),
+			Second = Color3.fromRGB(10, 16, 28),
+			Stroke = Color3.fromRGB(36, 58, 98),
+			Divider = Color3.fromRGB(20, 34, 56),
+			Text = Color3.fromRGB(240, 252, 255),
+			TextDark = Color3.fromRGB(130, 180, 210),
+			Accent = Color3.fromRGB(56, 189, 248),
+			Accent2 = Color3.fromRGB(192, 132, 252)
+		},
+		Nocturne = {
+			DisplayName = "Nocturne",
+			PremiumOnly = true,
+			LuxChrome = true,
+			Main = Color3.fromRGB(6, 6, 10),
+			Second = Color3.fromRGB(12, 12, 20),
+			Stroke = Color3.fromRGB(48, 44, 72),
+			Divider = Color3.fromRGB(26, 24, 42),
+			Text = Color3.fromRGB(245, 244, 255),
+			TextDark = Color3.fromRGB(150, 148, 190),
+			Accent = Color3.fromRGB(196, 181, 253),
+			Accent2 = Color3.fromRGB(255, 215, 128)
 		}
 	},
-	ThemeOrder = { "Default", "Obsidian", "Crimson", "Emerald", "Amethyst", "Aurum" },
+	ThemeOrder = {
+		"Default", "Obsidian", "Crimson", "Emerald", "Amethyst",
+		"Rose", "Slate", "Cyber", "Sunset",
+		"Aurum", "RubyLux", "Nexus", "Nocturne"
+	},
 	SelectedTheme = "Default",
 	Folder = nil,
 	SaveCfg = false
@@ -302,6 +394,51 @@ end
 
 function OrionLib:GetThemeKey()
 	return self.SelectedTheme
+end
+
+function OrionLib:RegisterPremiumListener(fn)
+	if type(fn) == "function" then
+		table.insert(self._PremiumListeners, fn)
+	end
+end
+
+function OrionLib:SetPremiumUnlocked(value, writeDisk)
+	self.PremiumUnlocked = value and true or false
+	if self.PremiumUnlocked and writeDisk and self._PremiumPersistPath and writefile then
+		pcall(function()
+			if self.Folder and makefolder and isfolder and not isfolder(self.Folder) then
+				makefolder(self.Folder)
+			end
+			writefile(self._PremiumPersistPath, "1")
+		end)
+	end
+	for _, fn in ipairs(self._PremiumListeners) do
+		pcall(fn)
+	end
+end
+
+function OrionLib:TryUnlockWithKey(rawKey)
+	local key = type(rawKey) == "string" and rawKey:gsub("^%s+", ""):gsub("%s+$", "") or ""
+	if key == "" then
+		return false
+	end
+	if self._PremiumVerifyFn then
+		local ok, res = pcall(self._PremiumVerifyFn, key)
+		if ok and res then
+			self:SetPremiumUnlocked(true, true)
+			return true
+		end
+		return false
+	end
+	if self._PremiumKeyList then
+		for _, k in ipairs(self._PremiumKeyList) do
+			if k == key then
+				self:SetPremiumUnlocked(true, true)
+				return true
+			end
+		end
+	end
+	return false
 end
 
 local function PackColor(Color)
@@ -749,7 +886,41 @@ function OrionLib:MakeWindow(WindowConfig)
 	WindowConfig.SaveConfig = WindowConfig.SaveConfig or false
 	WindowConfig.HidePremium = WindowConfig.HidePremium or false
 	WindowConfig.Premium = WindowConfig.Premium or false
-	OrionLib.PremiumUnlocked = WindowConfig.Premium == true
+	WindowConfig.PremiumKeys = WindowConfig.PremiumKeys or {}
+	WindowConfig.PremiumPersist = WindowConfig.PremiumPersist ~= false
+	WindowConfig.PremiumKeyUI = WindowConfig.PremiumKeyUI
+	if WindowConfig.PremiumKeyUI == nil then
+		WindowConfig.PremiumKeyUI = true
+	end
+
+	OrionLib._PremiumListeners = {}
+	OrionLib._PremiumVerifyFn = type(WindowConfig.VerifyPremiumKey) == "function" and WindowConfig.VerifyPremiumKey or nil
+	OrionLib._PremiumKeyList = {}
+	for _, k in ipairs(WindowConfig.PremiumKeys) do
+		if type(k) == "string" and k ~= "" then
+			table.insert(OrionLib._PremiumKeyList, k)
+		end
+	end
+	OrionLib._PremiumPersistPath = WindowConfig.ConfigFolder .. "/costum_premium_unlock.txt"
+
+	OrionLib.PremiumUnlocked = false
+	if WindowConfig.PremiumPersist then
+		pcall(function()
+			if isfile(OrionLib._PremiumPersistPath) then
+				OrionLib.PremiumUnlocked = true
+			end
+		end)
+	end
+	if WindowConfig.Premium == true then
+		OrionLib.PremiumUnlocked = true
+	end
+
+	local hasKeySystem = OrionLib._PremiumVerifyFn ~= nil or #OrionLib._PremiumKeyList > 0
+	local showPremiumKeyEntry = WindowConfig.PremiumKeyUI
+		and WindowConfig.Premium ~= true
+		and hasKeySystem
+		and not OrionLib.PremiumUnlocked
+
 	if WindowConfig.IntroEnabled == nil then
 		WindowConfig.IntroEnabled = true
 	end
@@ -774,9 +945,14 @@ function OrionLib:MakeWindow(WindowConfig)
 	local SidebarW = 226
 	local TabSearchInputRef = nil
 	local PremiumCrownRef = nil
+	local PremiumKeyOpenerRef = nil
+	local PremiumOverlayRegistry = {}
+
+	local SidebarFooterH = showPremiumKeyEntry and 100 or 62
+	local TabHolderBottomReserve = 52 + SidebarFooterH
 
 	local TabHolder = AddThemeObject(SetChildren(SetProps(MakeElement("ScrollFrame", Color3.fromRGB(255, 255, 255), 2), {
-		Size = UDim2.new(1, 0, 1, -112),
+		Size = UDim2.new(1, 0, 1, -TabHolderBottomReserve),
 		Position = UDim2.new(0, 0, 0, 52)
 	}), {
 		MakeElement("List", 0, 6),
@@ -869,26 +1045,61 @@ function OrionLib:MakeWindow(WindowConfig)
 		}),
 		TabHolder,
 		SetChildren(SetProps(MakeElement("TFrame"), {
-			Size = UDim2.new(1, 0, 0, 62),
-			Position = UDim2.new(0, 0, 1, -62)
-		}), {
-			AddThemeObject(SetProps(MakeElement("Frame"), {
+			Size = UDim2.new(1, 0, 0, SidebarFooterH),
+			Position = UDim2.new(0, 0, 1, -SidebarFooterH),
+			Name = "SidebarFooter"
+		}), (function()
+			local rows = {}
+			if showPremiumKeyEntry then
+				local premBtn = AddThemeObject(SetChildren(SetProps(MakeElement("RoundFrame", Color3.fromRGB(255, 255, 255), 0, 10), {
+					Size = UDim2.new(1, -24, 0, 32),
+					Position = UDim2.new(0, 12, 0, 8),
+					BackgroundTransparency = 0.42,
+					Name = "PremiumKeyOpener"
+				}), {
+					AddThemeObject(SetProps(MakeElement("Stroke"), {Transparency = 0.82, Thickness = 1.05}), "Stroke"),
+					AddThemeObject(SetProps(MakeElement("Image", "rbxassetid://3926305901"), {
+						Size = UDim2.new(0, 14, 0, 14),
+						Position = UDim2.new(0, 10, 0.5, -7),
+						ImageTransparency = 0.2,
+						Name = "PremIco"
+					}), "Accent"),
+					AddThemeObject(SetProps(MakeElement("Label", "Premium · Lizenz eingeben", 12), {
+						Size = UDim2.new(1, -36, 1, 0),
+						Position = UDim2.new(0, 28, 0, 0),
+						Font = Enum.Font.GothamBold,
+						TextSize = 12,
+						TextXAlignment = Enum.TextXAlignment.Left,
+						TextTransparency = 0.06
+					}), "Text"),
+					SetProps(MakeElement("Button"), {
+						Size = UDim2.new(1, 0, 1, 0),
+						Name = "PremiumKeyHit",
+						BackgroundTransparency = 1
+					})
+				}), "Second")
+				PremiumKeyOpenerRef = premBtn
+				table.insert(rows, premBtn)
+			end
+			local brandTop = showPremiumKeyEntry and 46 or 0
+			table.insert(rows, AddThemeObject(SetProps(MakeElement("Frame"), {
 				Size = UDim2.new(1, -20, 0, 1),
-				Position = UDim2.new(0, 10, 0, 0),
-				BackgroundTransparency = 0.55
-			}), "Stroke"),
-			AddThemeObject(SetProps(MakeElement("Label", WindowConfig.BrandName, 14), {
+				Position = UDim2.new(0, 10, 0, brandTop),
+				BackgroundTransparency = 0.55,
+				Name = "FooterLine"
+			}), "Stroke"))
+			table.insert(rows, AddThemeObject(SetProps(MakeElement("Label", WindowConfig.BrandName, 14), {
 				Size = UDim2.new(1, -28, 0, 18),
-				Position = UDim2.new(0, 14, 0, 12),
+				Position = UDim2.new(0, 14, 0, brandTop + 10),
 				Font = Enum.Font.GothamBold,
 				TextSize = 15,
 				ClipsDescendants = true,
 				Name = "BrandTitle",
 				TextXAlignment = Enum.TextXAlignment.Left
-			}), "Text"),
-			AddThemeObject(SetProps(MakeElement("Label", WindowConfig.BrandTag, 11), {
+			}), "Text"))
+			table.insert(rows, AddThemeObject(SetProps(MakeElement("Label", WindowConfig.BrandTag, 11), {
 				Size = UDim2.new(1, -28, 0, 28),
-				Position = UDim2.new(0, 14, 0, 30),
+				Position = UDim2.new(0, 14, 0, brandTop + 28),
 				Font = Enum.Font.GothamMedium,
 				TextTransparency = 0.12,
 				TextWrapped = true,
@@ -896,12 +1107,13 @@ function OrionLib:MakeWindow(WindowConfig)
 				Name = "BrandTag",
 				TextXAlignment = Enum.TextXAlignment.Left,
 				TextYAlignment = Enum.TextYAlignment.Top
-			}), "Accent")
-		}),
+			}), "Accent"))
+			return rows
+		end)()),
 	}), "Second")
 
 	local WindowName = AddThemeObject(SetProps(MakeElement("Label", WindowConfig.Name, 14), {
-		Size = UDim2.new(1, -420, 2, 0),
+		Size = UDim2.new(1, -520, 2, 0),
 		Position = UDim2.new(0, 28, 0, -26),
 		Font = Enum.Font.GothamBold,
 		TextSize = 18,
@@ -927,8 +1139,8 @@ function OrionLib:MakeWindow(WindowConfig)
 	})
 
 	local ThemePickerBtn = AddThemeObject(SetChildren(SetProps(MakeElement("RoundFrame", Color3.fromRGB(255, 255, 255), 0, 18), {
-		Size = UDim2.new(0, 96, 0, 38),
-		Position = UDim2.new(1, -408, 0, 8),
+		Size = UDim2.new(0, 92, 0, 38),
+		Position = UDim2.new(1, -114, 0, 8),
 		AnchorPoint = Vector2.new(1, 0),
 		Name = "ThemePickerBtn",
 		BackgroundTransparency = 0.42,
@@ -987,10 +1199,10 @@ function OrionLib:MakeWindow(WindowConfig)
 			PremiumCrown,
 			WindowName,
 			WindowTopBarLine,
-			ThemePickerBtn,
 			AddThemeObject(SetChildren(SetProps(MakeElement("RoundFrame", Color3.fromRGB(255, 255, 255), 0, 18), {
-				Size = UDim2.new(0, 196, 0, 38),
-				Position = UDim2.new(1, -304, 0, 8),
+				Size = UDim2.new(0, 168, 0, 38),
+				Position = UDim2.new(1, -218, 0, 8),
+				AnchorPoint = Vector2.new(1, 0),
 				Name = "TabSearchBar",
 				BackgroundTransparency = 0.52,
 				ClipsDescendants = true
@@ -1002,15 +1214,15 @@ function OrionLib:MakeWindow(WindowConfig)
 				}), "Stroke"),
 				AddThemeObject(SetProps(MakeElement("Image", "rbxassetid://6031094677"), {
 					Size = UDim2.new(0, 16, 0, 16),
-					Position = UDim2.new(0, 14, 0.5, -8),
+					Position = UDim2.new(0, 12, 0.5, -8),
 					ImageTransparency = 0.32,
 					Name = "SearchIco"
 				}), "TextDark"),
 				(function()
 					local tb = Create("TextBox", {
 						Name = "TabSearchInput",
-						Size = UDim2.new(1, -44, 0, 26),
-						Position = UDim2.new(0, 36, 0.5, -13),
+						Size = UDim2.new(1, -40, 0, 26),
+						Position = UDim2.new(0, 32, 0.5, -13),
 						BackgroundTransparency = 1,
 						Text = "",
 						PlaceholderText = "Tabs durchsuchen…",
@@ -1026,6 +1238,7 @@ function OrionLib:MakeWindow(WindowConfig)
 					return tb
 				end)()
 			}), "Second"),
+			ThemePickerBtn,
 			AddThemeObject(SetChildren(SetProps(MakeElement("RoundFrame", Color3.fromRGB(255, 255, 255), 0, 18), {
 				Size = UDim2.new(0, 88, 0, 38),
 				Position = UDim2.new(1, -98, 0, 8),
@@ -1055,7 +1268,7 @@ function OrionLib:MakeWindow(WindowConfig)
 
 	local ThemeScroll = SetChildren(SetProps(MakeElement("ScrollFrame", Color3.fromRGB(255, 255, 255), 2), {
 		Name = "ThemeScroll",
-		Size = UDim2.new(1, -24, 0, 198),
+		Size = UDim2.new(1, -24, 0, 312),
 		Position = UDim2.new(0, 12, 0, 40),
 		BackgroundTransparency = 1,
 		BorderSizePixel = 0,
@@ -1071,8 +1284,8 @@ function OrionLib:MakeWindow(WindowConfig)
 	})
 
 	local ThemeHint = AddThemeObject(SetProps(MakeElement("Label", "", 11), {
-		Size = UDim2.new(1, -24, 0, 28),
-		Position = UDim2.new(0, 12, 1, -34),
+		Size = UDim2.new(1, -24, 0, 36),
+		Position = UDim2.new(0, 12, 1, -40),
 		Font = Enum.Font.GothamMedium,
 		TextSize = 11,
 		TextTransparency = 0.35,
@@ -1084,8 +1297,8 @@ function OrionLib:MakeWindow(WindowConfig)
 	local ThemeDropdown = AddThemeObject(SetChildren(SetProps(MakeElement("RoundFrame", Color3.fromRGB(255, 255, 255), 0, 16), {
 		Parent = MainWindow,
 		Name = "ThemeDropdown",
-		Size = UDim2.new(0, 228, 0, 278),
-		Position = UDim2.new(1, -14, 0, 50),
+		Size = UDim2.new(0, 252, 0, 408),
+		Position = UDim2.new(1, -12, 0, 50),
 		AnchorPoint = Vector2.new(1, 0),
 		Visible = false,
 		ZIndex = 35,
@@ -1111,7 +1324,7 @@ function OrionLib:MakeWindow(WindowConfig)
 			ThemeHint.Text = ""
 			ThemeHint.Visible = false
 		else
-			ThemeHint.Text = "Theme „Aurum“ ist mit Premium freigeschaltet."
+			ThemeHint.Text = "Premium-Themes (Aurum, Ruby Luxe, Nexus, Nocturne): Lizenz in der Sidebar eingeben."
 			ThemeHint.Visible = true
 		end
 	end
@@ -1231,11 +1444,12 @@ function OrionLib:MakeWindow(WindowConfig)
 			TabSearchInputRef.PlaceholderColor3 = T.TextDark
 		end
 		local ch = MainWindow:FindFirstChild("WindowChrome", true)
-		if ch and ch:IsA("UIStroke") then
-			if OrionLib.SelectedTheme == "Aurum" then
-				ch.Transparency = 0.5
+		local pal = OrionLib.Themes[OrionLib.SelectedTheme]
+		if ch and ch:IsA("UIStroke") and pal then
+			if pal.LuxChrome then
+				ch.Transparency = 0.48
 				ch.Color = T.Accent2
-				ch.Thickness = 1.35
+				ch.Thickness = 1.38
 			else
 				ch.Transparency = 0.78
 				ch.Color = T.Accent
@@ -1243,6 +1457,208 @@ function OrionLib:MakeWindow(WindowConfig)
 			end
 		end
 		rebuildThemeRows()
+	end)
+
+	local PremiumUnlockLayer = SetProps(MakeElement("TFrame"), {
+		Name = "PremiumUnlockLayer",
+		Size = UDim2.new(1, 0, 1, 0),
+		Position = UDim2.new(0, 0, 0, 0),
+		BackgroundTransparency = 1,
+		Visible = false,
+		ZIndex = 200,
+		Parent = MainWindow
+	})
+	local PremiumDim = Create("TextButton", {
+		Name = "PremiumDim",
+		Size = UDim2.new(1, 0, 1, 0),
+		BackgroundColor3 = Color3.fromRGB(0, 0, 0),
+		BackgroundTransparency = 0.45,
+		BorderSizePixel = 0,
+		Text = "",
+		AutoButtonColor = false,
+		ZIndex = 201
+	})
+	PremiumDim.Parent = PremiumUnlockLayer
+	local PremiumCard = AddThemeObject(SetChildren(SetProps(MakeElement("RoundFrame", Color3.fromRGB(255, 255, 255), 0, 20), {
+		Size = UDim2.new(0, 336, 0, 248),
+		Position = UDim2.new(0.5, 0, 0.5, 0),
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		BackgroundTransparency = 0.08,
+		ZIndex = 205,
+		Name = "PremiumCard"
+	}), {
+		AddThemeObject(SetProps(MakeElement("Stroke"), {Transparency = 0.65, Thickness = 1.2, Name = "CardStroke"}), "Accent"),
+		Create("UIGradient", {
+			Rotation = 100,
+			Transparency = NumberSequence.new(0.92, 1),
+			Color = ColorSequence.new(Color3.fromRGB(255, 255, 255), Color3.fromRGB(200, 210, 230))
+		}),
+		AddThemeObject(SetProps(MakeElement("Label", "Premium freischalten", 18), {
+			Size = UDim2.new(1, -32, 0, 28),
+			Position = UDim2.new(0, 20, 0, 20),
+			Font = Enum.Font.GothamBold,
+			TextSize = 19,
+			TextXAlignment = Enum.TextXAlignment.Left,
+			Name = "PremTitle"
+		}), "Text"),
+		AddThemeObject(SetProps(MakeElement("Label", "Gib deinen Lizenzschlüssel ein. Den erhältst du z. B. über Discord.", 12), {
+			Size = UDim2.new(1, -32, 0, 36),
+			Position = UDim2.new(0, 20, 0, 50),
+			TextWrapped = true,
+			TextXAlignment = Enum.TextXAlignment.Left,
+			TextTransparency = 0.25,
+			Name = "PremSub"
+		}), "TextDark"),
+		AddThemeObject(SetChildren(SetProps(MakeElement("RoundFrame", Color3.fromRGB(255, 255, 255), 0, 12), {
+			Size = UDim2.new(1, -40, 0, 40),
+			Position = UDim2.new(0, 20, 0, 96),
+			BackgroundTransparency = 0.5,
+			Name = "KeyShell"
+		}), {
+			AddThemeObject(SetProps(MakeElement("Stroke"), {Transparency = 0.85, Thickness = 1.05}), "Stroke"),
+			Create("TextBox", {
+				Name = "PremiumKeyInput",
+				Size = UDim2.new(1, -20, 1, -8),
+				Position = UDim2.new(0, 10, 0, 4),
+				BackgroundTransparency = 1,
+				Text = "",
+				PlaceholderText = "XXXX-XXXX-XXXX",
+				TextColor3 = OrionLib.Themes[OrionLib.SelectedTheme].Text,
+				PlaceholderColor3 = OrionLib.Themes[OrionLib.SelectedTheme].TextDark,
+				TextSize = 15,
+				Font = Enum.Font.GothamMedium,
+				ClearTextOnFocus = false,
+				TextXAlignment = Enum.TextXAlignment.Left
+			})
+		}), "Second"),
+		SetChildren(SetProps(MakeElement("RoundFrame", Color3.fromRGB(255, 255, 255), 0, 12), {
+			Size = UDim2.new(0, 140, 0, 40),
+			Position = UDim2.new(0, 20, 0, 152),
+			BackgroundTransparency = 0.25,
+			Name = "ActivateBtn"
+		}), {
+			AddThemeObject(SetProps(MakeElement("Stroke"), {Transparency = 0.7, Thickness = 1.1, Color = OrionLib.Themes[OrionLib.SelectedTheme].Accent}), "Accent"),
+			AddThemeObject(SetProps(MakeElement("Label", "Aktivieren", 14), {
+				Size = UDim2.new(1, 0, 1, 0),
+				Font = Enum.Font.GothamBold,
+				TextSize = 15,
+				Name = "ActLbl"
+			}), "Text"),
+			SetProps(MakeElement("Button"), {
+				Size = UDim2.new(1, 0, 1, 0),
+				Name = "ActHit",
+				BackgroundTransparency = 1
+			})
+		}),
+		Create("TextButton", {
+			Size = UDim2.new(0, 32, 0, 32),
+			Position = UDim2.new(1, -12, 0, 12),
+			AnchorPoint = Vector2.new(1, 0),
+			BackgroundColor3 = Color3.fromRGB(40, 44, 56),
+			BackgroundTransparency = 0.35,
+			Text = "✕",
+			TextSize = 16,
+			Font = Enum.Font.GothamBold,
+			TextColor3 = Color3.fromRGB(240, 242, 255),
+			Name = "PremClose",
+			AutoButtonColor = false,
+			ZIndex = 206,
+			BorderSizePixel = 0
+		}, {
+			Create("UICorner", {CornerRadius = UDim.new(0, 10)})
+		})
+	}), "Second")
+	PremiumCard.Parent = PremiumUnlockLayer
+
+	local function openPremiumModal()
+		PremiumUnlockLayer.Visible = true
+		local inp = PremiumCard:FindFirstChild("PremiumKeyInput", true)
+		if inp then
+			inp:CaptureFocus()
+		end
+	end
+	local function closePremiumModal()
+		PremiumUnlockLayer.Visible = false
+	end
+	local function shakePremiumCard()
+		local card = PremiumCard
+		local b = card.Position
+		spawn(function()
+			for _ = 1, 4 do
+				TweenService:Create(card, TweenInfo.new(0.04, Enum.EasingStyle.Quad), {
+					Position = UDim2.new(b.X.Scale, b.X.Offset + 10, b.Y.Scale, b.Y.Offset)
+				}):Play()
+				wait(0.05)
+				TweenService:Create(card, TweenInfo.new(0.04, Enum.EasingStyle.Quad), {
+					Position = UDim2.new(b.X.Scale, b.X.Offset - 10, b.Y.Scale, b.Y.Offset)
+				}):Play()
+				wait(0.05)
+			end
+			TweenService:Create(card, TweenInfo.new(0.12, Enum.EasingStyle.Quint), {Position = b}):Play()
+		end)
+	end
+	local function tryPremiumFromModal()
+		local inp = PremiumCard:FindFirstChild("PremiumKeyInput", true)
+		local raw = inp and inp.Text or ""
+		if OrionLib:TryUnlockWithKey(raw) then
+			closePremiumModal()
+			OrionLib:MakeNotification({
+				Name = "Premium",
+				Content = "Freigeschaltet – alle Premium-Themes und Tabs sind aktiv.",
+				Image = "rbxassetid://3944688395",
+				Time = 4
+			})
+		else
+			local st = PremiumCard:FindFirstChild("CardStroke", true)
+			if st and st:IsA("UIStroke") then
+				st.Color = Color3.fromRGB(255, 80, 100)
+				TweenService:Create(st, TweenInfo.new(0.35, Enum.EasingStyle.Quint), {Color = OrionLib.Themes[OrionLib.SelectedTheme].Accent}):Play()
+			end
+			shakePremiumCard()
+		end
+	end
+
+	AddConnection(PremiumDim.MouseButton1Click, closePremiumModal)
+	local premClose = PremiumCard:FindFirstChild("PremClose")
+	if premClose then
+		AddConnection(premClose.MouseButton1Click, closePremiumModal)
+	end
+	local actHit = PremiumCard:FindFirstChild("ActHit", true)
+	if actHit then
+		AddConnection(actHit.MouseButton1Click, tryPremiumFromModal)
+	end
+	if showPremiumKeyEntry and PremiumKeyOpenerRef then
+		local hit = PremiumKeyOpenerRef:FindFirstChild("PremiumKeyHit")
+		if hit then
+			AddConnection(hit.MouseButton1Click, openPremiumModal)
+		end
+	end
+
+	local function applyPremiumVisualState()
+		if PremiumCrownRef then
+			PremiumCrownRef.Visible = OrionLib.PremiumUnlocked
+		end
+		if PremiumKeyOpenerRef then
+			PremiumKeyOpenerRef.Visible = hasKeySystem and WindowConfig.Premium ~= true and not OrionLib.PremiumUnlocked
+		end
+		for _, ov in ipairs(PremiumOverlayRegistry) do
+			if ov and ov.Parent then
+				ov.Visible = not OrionLib.PremiumUnlocked
+			end
+		end
+		refreshThemeHint()
+		rebuildThemeRows()
+	end
+	OrionLib:RegisterPremiumListener(applyPremiumVisualState)
+	applyPremiumVisualState()
+
+	table.insert(OrionLib._ThemeListeners, function()
+		local T = OrionLib.Themes[OrionLib.SelectedTheme]
+		local pk = PremiumCard and PremiumCard:FindFirstChild("PremiumKeyInput", true)
+		if pk and pk:IsA("TextBox") then
+			pk.TextColor3 = T.Text
+			pk.PlaceholderColor3 = T.TextDark
+		end
 	end)
 
 	if WindowConfig.ShowIcon then
@@ -2895,46 +3311,58 @@ function OrionLib:MakeWindow(WindowConfig)
 			ElementFunction[i] = v 
 		end
 
-		if TabConfig.PremiumOnly and not OrionLib.PremiumUnlocked then
-			for i, v in next, ElementFunction do
-				ElementFunction[i] = function() end
-			end    
-			Container:FindFirstChild("UIListLayout"):Destroy()
-			Container:FindFirstChild("UIPadding"):Destroy()
-			SetChildren(SetProps(MakeElement("TFrame"), {
-				Size = UDim2.new(1, 0, 1, 0),
-				Parent = Container
+		if TabConfig.PremiumOnly then
+			local ThP = OrionLib.Themes[OrionLib.SelectedTheme]
+			local gate = SetChildren(SetProps(MakeElement("RoundFrame", ThP.Main, 0, 18), {
+				Name = "PremiumLockOverlay",
+				Size = UDim2.new(1, 8, 1, 8),
+				Position = UDim2.new(0.5, 0, 0.5, 0),
+				AnchorPoint = Vector2.new(0.5, 0.5),
+				BackgroundTransparency = 0.25,
+				ZIndex = 100,
+				Visible = not OrionLib.PremiumUnlocked,
+				ClipsDescendants = true
 			}), {
-				AddThemeObject(SetProps(MakeElement("Image", "rbxassetid://3610239960"), {
-					Size = UDim2.new(0, 18, 0, 18),
-					Position = UDim2.new(0, 15, 0, 15),
-					ImageTransparency = 0.4
+				Create("UIGradient", {
+					Rotation = 95,
+					Transparency = NumberSequence.new({
+						NumberSequenceKeypoint.new(0, 0.55),
+						NumberSequenceKeypoint.new(1, 0.75)
+					})
+				}),
+				AddThemeObject(SetProps(MakeElement("Stroke"), {Transparency = 0.55, Thickness = 1.1}), "Stroke"),
+				AddThemeObject(SetProps(MakeElement("Image", "rbxassetid://3926305901"), {
+					Size = UDim2.new(0, 52, 0, 52),
+					Position = UDim2.new(0.5, 0, 0.36, 0),
+					AnchorPoint = Vector2.new(0.5, 0.5),
+					ImageTransparency = 0.12,
+					Name = "LockHero"
+				}), "Accent"),
+				AddThemeObject(SetProps(MakeElement("Label", "Premium-Bereich", 20), {
+					Size = UDim2.new(1, -40, 0, 28),
+					Position = UDim2.new(0.5, 0, 0.5, -8),
+					AnchorPoint = Vector2.new(0.5, 0),
+					Font = Enum.Font.GothamBold,
+					TextSize = 20,
+					TextXAlignment = Enum.TextXAlignment.Center
 				}), "Text"),
-				AddThemeObject(SetProps(MakeElement("Label", "Unauthorised Access", 14), {
-					Size = UDim2.new(1, -38, 0, 14),
-					Position = UDim2.new(0, 38, 0, 18),
-					TextTransparency = 0.4
-				}), "Text"),
-				AddThemeObject(SetProps(MakeElement("Image", "rbxassetid://4483345875"), {
-					Size = UDim2.new(0, 56, 0, 56),
-					Position = UDim2.new(0, 84, 0, 110),
-				}), "Text"),
-				AddThemeObject(SetProps(MakeElement("Label", "Premium Features", 14), {
-					Size = UDim2.new(1, -150, 0, 14),
-					Position = UDim2.new(0, 150, 0, 112),
-					Font = Enum.Font.GothamBold
-				}), "Text"),
-				AddThemeObject(SetProps(MakeElement("Label", "Dieser Tab ist Premium-geschützt. Mehr dazu im Discord (z. B. discord.gg/pX5a9DHwmc).", 12), {
-					Size = UDim2.new(1, -200, 0, 14),
-					Position = UDim2.new(0, 150, 0, 138),
+				AddThemeObject(SetProps(MakeElement("Label", "Schalte Premium mit deinem Lizenzschlüssel frei (Sidebar unten).", 13), {
+					Size = UDim2.new(1, -48, 0, 50),
+					Position = UDim2.new(0.5, 0, 0.5, 28),
+					AnchorPoint = Vector2.new(0.5, 0),
 					TextWrapped = true,
-					TextTransparency = 0.4
-				}), "Text")
+					TextTransparency = 0.2,
+					TextXAlignment = Enum.TextXAlignment.Center
+				}), "TextDark")
 			})
+			gate.Parent = Container
+			table.insert(PremiumOverlayRegistry, gate)
 		end
 		return ElementFunction   
 	end  
 	
+	TabFunction.OpenPremiumUnlock = openPremiumModal
+
 	return TabFunction
 end   
 
