@@ -813,6 +813,8 @@ task.spawn(function()
                         local autorobBankClubToggle = false
                         local autorobContainersToggle = false
                         local autoSellToggle = false
+                        -- Third-Person Scriptable nur im Fahrzeug (zu Fuß immer normale Cam). Aus = durchgehend Custom.
+                        local vehicleCameraLockEnabled = true
                         local tweenSpeed = 175  
                         local AutoTeleportEnabled = true
                         local vehicleSpeedDivider = tweenSpeed
@@ -947,6 +949,9 @@ task.spawn(function()
                                     autorobBankClubToggle = config.autorobBankClubToggle or false
                                     autorobContainersToggle = config.autorobContainersToggle or false
                                     autoSellToggle = config.autoSellToggle or false
+                                    if config.vehicleCameraLockEnabled ~= nil then
+                                        vehicleCameraLockEnabled = config.vehicleCameraLockEnabled
+                                    end
                                     tweenSpeed = tonumber(config.tweenSpeed) or tweenSpeed
                                     plrTweenSpeed = tonumber(config.plrTweenSpeed) or plrTweenSpeed
                                     abortHealth = tonumber(config.abortHealth) or abortHealth
@@ -982,6 +987,7 @@ task.spawn(function()
                                 autorobBankClubToggle = autorobBankClubToggle,
                                 autorobContainersToggle = autorobContainersToggle,
                                 autoSellToggle = autoSellToggle,
+                                vehicleCameraLockEnabled = vehicleCameraLockEnabled,
                                 plrTweenSpeed = plrTweenSpeed,
                                 tweenSpeed = tweenSpeed,
                                 abortHealth = abortHealth,
@@ -1086,6 +1092,15 @@ task.spawn(function()
                                 autoSellToggle = Value
                                 saveConfig()
                             end    
+                        })
+
+                        AutoRobTab:AddToggle({
+                            Name = "Vehicle Camera Lock (Third Person)",
+                            Default = vehicleCameraLockEnabled,
+                            Callback = function(Value)
+                                vehicleCameraLockEnabled = Value
+                                saveConfig()
+                            end
                         })
 
                         AutoRobTab:AddToggle({
@@ -1390,6 +1405,14 @@ task.spawn(function()
 
                         local DEALER_TARGET_BOMB_COUNT = 3
 
+                        local function toolNameLooksLikeGold(toolName)
+                            local n = string.lower(tostring(toolName))
+                            return n == "gold"
+                                or string.find(n, "gold", 1, true) ~= nil
+                                or string.find(n, "barren", 1, true) ~= nil
+                                or string.find(n, "ingot", 1, true) ~= nil
+                        end
+
                         local function playerHasGoldInInventory(who)
                             who = who or plr
                             if not who then
@@ -1400,11 +1423,8 @@ task.spawn(function()
                                     return false
                                 end
                                 for _, d in ipairs(container:GetDescendants()) do
-                                    if d:IsA("Tool") then
-                                        local n = string.lower(d.Name)
-                                        if n == "gold" or (string.find(n, "gold", 1, true) ~= nil) then
-                                            return true
-                                        end
+                                    if d:IsA("Tool") and toolNameLooksLikeGold(d.Name) then
+                                        return true
                                     end
                                 end
                                 return false
@@ -2106,7 +2126,7 @@ end
                             lyphixDealerApproachActive = false
                         end
 
-                        -- Dealer: Gold verkaufen nur wenn Auto-Sell an + Gold im Inventar; Bomben auf genau 3 auffüllen (≥3 = kein Kauf).
+                        -- Dealer: Auto-Sell + Gold → mehrstufig verkaufen bis weg; Bomben auf 3 (mit Nachsync-Käufen).
                         local function performSingleDealerTrip()
                             local hasGold = playerHasGoldInInventory()
                             local doSell = autoSellToggle and hasGold
@@ -2117,33 +2137,36 @@ end
                             end
                             ensurePlayerInVehicle()
                             MoveToDealer()
-                            task.wait(0.16)
+                            task.wait(0.45)
+
+                            local argsSell = { [1] = "Gold", [2] = "Dealer" }
                             if doSell then
-                                local argsSell = { [1] = "Gold", [2] = "Dealer" }
-                                sellRemoteEvent:FireServer(unpack(argsSell))
-                                sellRemoteEvent:FireServer(unpack(argsSell))
-                                sellRemoteEvent:FireServer(unpack(argsSell))
-                                task.wait(0.22)
-                            end
-                            task.wait(0.1)
-                            local heldNow = countBombsInInventory()
-                            local toBuy = math.max(0, DEALER_TARGET_BOMB_COUNT - heldNow)
-                            if toBuy > 0 then
-                                local argsBuy = { [1] = "Bomb", [2] = "Dealer" }
-                                for _ = 1, toBuy do
-                                    if countBombsInInventory() >= DEALER_TARGET_BOMB_COUNT then
+                                for wave = 1, 4 do
+                                    if not playerHasGoldInInventory() then
                                         break
                                     end
-                                    buyRemoteEvent:FireServer(unpack(argsBuy))
-                                    recordBombPurchase()
-                                    task.wait(0.14)
+                                    for _ = 1, 4 do
+                                        sellRemoteEvent:FireServer(unpack(argsSell))
+                                    end
+                                    task.wait(0.32)
                                 end
-                                local deadline = os.clock() + 6
-                                while countBombsInInventory() < DEALER_TARGET_BOMB_COUNT and os.clock() < deadline do
-                                    task.wait(0.05)
-                                end
+                                task.wait(0.4)
                             end
-                            task.wait(0.06)
+
+                            task.wait(0.15)
+                            local argsBuy = { [1] = "Bomb", [2] = "Dealer" }
+                            local buyAttempts = 0
+                            while countBombsInInventory() < DEALER_TARGET_BOMB_COUNT and buyAttempts < 12 do
+                                buyAttempts = buyAttempts + 1
+                                buyRemoteEvent:FireServer(unpack(argsBuy))
+                                recordBombPurchase()
+                                task.wait(0.22)
+                            end
+                            local syncDeadline = os.clock() + 8
+                            while countBombsInInventory() < DEALER_TARGET_BOMB_COUNT and os.clock() < syncDeadline do
+                                task.wait(0.07)
+                            end
+                            task.wait(0.1)
                             return true
                         end
 
@@ -2190,7 +2213,12 @@ end
                                 if not cam then
                                     return
                                 end
-                                -- Nur XZ-Richtung: volle LookVector zieht die Cam nach oben → Wurf fliegt zu hoch.
+                                -- Zu Fuß oder Lock aus: normale Custom-Cam (kein Scriptable — Würfe, Juwelier).
+                                if not inVehicle or not vehicleCameraLockEnabled then
+                                    cam.CameraType = Enum.CameraType.Custom
+                                    cam.CameraSubject = hum
+                                    return
+                                end
                                 local pos = focusPart.Position
                                 local lv = focusPart.CFrame.LookVector
                                 local flat = Vector3.new(lv.X, 0, lv.Z)
@@ -2200,16 +2228,8 @@ end
                                     flat = flat.Unit
                                 end
                                 local backOffset = flat * -5.5
-                                local cameraPosition
-                                local lookAtPosition
-                                if inVehicle then
-                                    cameraPosition = pos + backOffset + Vector3.new(0, 2.35, 0)
-                                    lookAtPosition = pos + flat * 14 + Vector3.new(0, 0.65, 0)
-                                else
-                                    -- Zu Fuß: niedrige Cam, Ziel weit **vorne** auf fast gleicher Höhe = flacher Wurf
-                                    cameraPosition = pos + backOffset + Vector3.new(0, 1.45, 0)
-                                    lookAtPosition = pos + flat * 11 + Vector3.new(0, 0.15, 0)
-                                end
+                                local cameraPosition = pos + backOffset + Vector3.new(0, 2.35, 0)
+                                local lookAtPosition = pos + flat * 14 + Vector3.new(0, 0.65, 0)
                                 cam.CameraType = Enum.CameraType.Scriptable
                                 cam.CFrame = CFrame.new(cameraPosition, lookAtPosition)
                             end)
@@ -2331,7 +2351,13 @@ end
                                     task.wait(0.5)
 
                                     plrTween(Vector3.new(-437.28814697265625, 21.223413467407227, 3553.262939453125))
-                                    task.wait(0.5)
+                                    task.wait(0.38)
+                                    local jHrp = plr.Character and plr.Character:FindFirstChild("HumanoidRootPart")
+                                    if jHrp then
+                                        local jp = jHrp.Position
+                                        jHrp.CFrame = CFrame.lookAt(jp, Vector3.new(JewelerSafe.X, jp.Y, JewelerSafe.Z))
+                                    end
+                                    task.wait(0.18)
 
                                     setRobBankCameraLockSuspended(true)
                                     pcall(function()
@@ -2346,6 +2372,7 @@ end
 
                                         task.wait(0.5)
                                         fireBombRemoteEvent:FireServer()
+                                        task.wait(0.28)
                                     end)
                                     setRobBankCameraLockSuspended(false)
 
