@@ -2163,35 +2163,12 @@ end
                                 if not cam then
                                     return
                                 end
-                                local pos = focusPart.Position
-                                local lv = focusPart.CFrame.LookVector
-                                local camPos
-                                local lookAt
-                                if inVehicle then
-                                    local back = -lv
-                                    camPos = pos + back * 7 + Vector3.new(0, 2.4, 0)
-                                    lookAt = pos + Vector3.new(0, 1.35, 0)
-                                else
-                                    -- Zu Fuß: nur XZ-Blick (kein Hochziehen durch Pitch), tieferer Aim → Bombe flacher (Juwelier etc.)
-                                    local flat = Vector3.new(lv.X, 0, lv.Z)
-                                    if flat.Magnitude < 0.08 then
-                                        flat = Vector3.new(0, 0, -1)
-                                    else
-                                        flat = flat.Unit
-                                    end
-                                    local back = -flat
-                                    camPos = pos + back * 6.5 + Vector3.new(0, 1.55, 0)
-                                    lookAt = pos + flat * 5 + Vector3.new(0, 0.85, 0)
-                                end
-                                local targetCF = CFrame.new(camPos, lookAt)
+                                -- festes Third-Person wie lockCamera(): 6 hinten, +5 Kamera-Höhe, Blick auf +2 über Root
+                                local backOffset = focusPart.CFrame.LookVector * -6
+                                local cameraPosition = focusPart.Position + backOffset + Vector3.new(0, 5, 0)
+                                local lookAtPosition = focusPart.Position + Vector3.new(0, 2, 0)
                                 cam.CameraType = Enum.CameraType.Scriptable
-                                local alpha = math.clamp(15 * dt, 0, 1)
-                                if not robBankCameraSmoothedCF then
-                                    robBankCameraSmoothedCF = targetCF
-                                else
-                                    robBankCameraSmoothedCF = robBankCameraSmoothedCF:Lerp(targetCF, alpha)
-                                end
-                                cam.CFrame = robBankCameraSmoothedCF
+                                cam.CFrame = CFrame.new(cameraPosition, lookAtPosition)
                             end)
 
                             local clubPos = Vector3.new(-1739.5330810546875, 11, 3052.31103515625)
