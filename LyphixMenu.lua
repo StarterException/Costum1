@@ -542,7 +542,7 @@ local function getPoliceNearbyInfo()
 	return nearby, nearest
 end
 
--- reason: "server_hop" | "manual" | "test" — Polizei nur bei Hop zuverlässig sinnvoll
+-- reason: "server_hop" | "manual" | "test"
 local function sendSessionReport(info)
 	info = info or {}
 	local reason = info.reason or "manual"
@@ -579,37 +579,37 @@ local function sendSessionReport(info)
 	local titlePrefix
 	if policeNearby then
 		embedColor = 16711680
-		titlePrefix = "🚨 POLIZEI NAH · "
+		titlePrefix = "POLICE NEARBY · "
 	elseif reason == "server_hop" then
 		embedColor = 15158332
-		titlePrefix = "🔻 Server Hop · "
+		titlePrefix = "Server hop · "
 	elseif reason == "test" then
 		embedColor = 11041289
-		titlePrefix = "🧪 Webhook-Test · "
+		titlePrefix = "Webhook test · "
 	else
 		embedColor = 12632918
-		titlePrefix = "📣 Manuell · "
+		titlePrefix = "Manual report · "
 	end
 
 	local reasonLine
 	if reason == "server_hop" then
-		reasonLine = "Auslöser: **Server-Wechsel** (Teleport) — Werte zum **Leave** aus der UI."
+		reasonLine = "Trigger: server hop. UI snapshot at leave. Any active vehicle tween was cancelled so you stay at the hop spot."
 	elseif reason == "test" then
-		reasonLine = "Auslöser: **Webhook-Test** — Live-Snapshot aus der UI."
+		reasonLine = "Trigger: webhook test (live UI snapshot)."
 	else
-		reasonLine = "Auslöser: **Manueller Sessionbericht**."
+		reasonLine = "Trigger: manual session report."
 	end
 
 	local policeLine
 	if policeNearby then
-		policeLine = string.format("**Status:** `GEFÄHRLICH` — Polizei innerhalb **150 m**.\n**Distanz (nächster):** `%.1f m`", policeDist or 0)
+		policeLine = string.format("ALERT · Police within 150m\nNearest approx: %.0f studs", policeDist or 0)
 	else
-		policeLine = "**Status:** `OK` — keine Polizei im **150 m**-Radius (oder nicht ermittelbar)."
+		policeLine = "CLEAR · No police within 150m (or could not detect)."
 	end
 
 	local hopNo = tonumber(sessionMeta.hopIndex) or 0
 	local leaveCash = tostring(webhookStats.currentBalance or "0")
-	local leaveGold = tostring(webhookStats.currentGold or "—")
+	local leaveGold = tostring(webhookStats.currentGold or "n/a")
 
 	local payload = {
 		username = "Lyphix · Emergency Hamburg",
@@ -617,68 +617,49 @@ local function sendSessionReport(info)
 		embeds = {
 			{
 				author = {
-					name = "Lyphix · Emergency Hamburg · AutoRob",
+					name = "Lyphix · Emergency Hamburg",
 					url = gameUrl,
 					icon_url = headshot,
 				},
-				title = titlePrefix .. "Session-Report (#" .. tostring(hopNo) .. ")",
+				title = titlePrefix .. "Session report (#" .. tostring(hopNo) .. ")",
 				url = gameUrl,
-				description = string.format(
-					"**%s**\n%s\n\n⏱ **%s** · Hop **`#%d`** · Stats werden in `LyphixEmergencyHamburg_autorob.json` mitgeschrieben (über Teleports).",
-					playerName,
+				description = table.concat({
+					"Player: **" .. playerName .. "**",
 					reasonLine,
-					os.date("!%H:%M:%S UTC"),
-					hopNo
-				),
+					"",
+					"UTC **" .. os.date("!%Y-%m-%d %H:%M:%S") .. "** · Hop **#" .. tostring(hopNo) .. "**",
+					"Persistent stats file: LyphixEmergencyHamburg_autorob.json",
+				}, "\n"),
 				color = embedColor,
 				thumbnail = { url = headshot },
 				fields = {
 					{
-						name = "💶 Leave — Bargeld & Gold (UI)",
-						value = string.format(
-							"**Bargeld (€):** `%s €`\n**Gold:** `%s`",
-							leaveCash,
-							leaveGold
-						),
+						name = "Leave snapshot (UI)",
+						value = "Cash: " .. leaveCash .. " €\nGold: " .. leaveGold,
 						inline = false,
 					},
 					{
-						name = "📊 Session — kumuliert (gespeichert)",
-						value = string.format(
-							"• Bomben gekauft: **`%d`**\n• Safes / Money-Mesh: **`%d`**\n• Bereits leer / ignoriert: **`%d`**",
-							webhookStats.bombsPurchased,
-							webhookStats.safesRobbed,
-							webhookStats.alreadyRobbedIgnored
-						),
-						inline = true,
+						name = "Session totals (persisted)",
+						value = "Bombs bought: " .. tostring(webhookStats.bombsPurchased) .. "\nSafes robbed: " .. tostring(webhookStats.safesRobbed) .. "\nEmpty / skipped: " .. tostring(webhookStats.alreadyRobbedIgnored),
+						inline = false,
 					},
 					{
-						name = "🚔 Polizei",
+						name = "Police",
 						value = policeLine,
-						inline = true,
+						inline = false,
 					},
 					{
-						name = "👤 Spieler",
-						value = string.format(
-							"[%s](%s)\n`UserId %d`",
-							playerName,
-							profileUrl,
-							userId
-						),
-						inline = true,
+						name = "Player",
+						value = "[" .. playerName .. "](" .. profileUrl .. ")\nUserId: " .. tostring(userId),
+						inline = false,
 					},
 					{
-						name = "🌐 Server",
-						value = string.format(
-							"**PlaceId:** `%d`\n**JobId:** `%s`\n**Online:** `%d`",
-							placeId,
-							jobId,
-							playing
-						),
-						inline = true,
+						name = "Server",
+						value = "PlaceId: " .. tostring(placeId) .. "\nJobId: " .. jobId .. "\nPlayers online: " .. tostring(playing),
+						inline = false,
 					},
 				},
-				footer = { text = "Lyphix · Emergency Hamburg · kumulierter AutoRob" },
+				footer = { text = "Lyphix · Emergency Hamburg · AutoRob" },
 				timestamp = os.date("!%Y-%m-%dT%H:%M:%SZ"),
 			},
 		},
@@ -688,7 +669,7 @@ local function sendSessionReport(info)
 	local requestFunc = request or http_request or (syn and syn.request) or (fluxus and fluxus.request)
 
 	if not requestFunc then
-		warn("ERROR: Keine HTTP-Request-Funktion — Webhook nicht möglich.")
+		warn("ERROR: No HTTP request function available for webhooks.")
 		return false
 	end
 
@@ -720,7 +701,7 @@ local function sendSessionReport(info)
 		task.wait(0.65 * attempt)
 	end
 
-	warn("[Webhook] Senden nach Versuchen fehlgeschlagen: " .. tostring(lastErr))
+	warn("[Webhook] Failed after retries: " .. tostring(lastErr))
 	return false
 end
 
@@ -731,6 +712,12 @@ local function performServerHop()
 		return
 	end
 	isServerHopping = true
+
+	pcall(function()
+		if LyphixCancelVehicleTween then
+			LyphixCancelVehicleTween()
+		end
+	end)
 
 	print("[ServerHop] Starting server hop...")
 
@@ -1409,6 +1396,8 @@ task.spawn(function()
                             teleportActive = false
                         end
 
+                        LyphixCancelVehicleTween = stopCurrentTween
+
                         local function checkForBomb()
                             if not bombDetectionEnabled then return false end
 
@@ -1906,7 +1895,7 @@ end
                             local HumanoidRootPart = Character:WaitForChild("HumanoidRootPart")
 
                             local Collected = {}
-                            local ProximityPromptTimeBet = 2.3
+                            local ProximityPromptTimeBet = 2.5
                             local Range = 30
                             local Robberies = {}
 
@@ -2014,6 +2003,9 @@ end
                         end
 
                         local function robBankAndClub()
+                            if isServerHopping then
+                                return
+                            end
                             local player = game.Players.LocalPlayer
                             local character = player.Character or player.CharacterAdded:Wait()
                             local humanoid = character:WaitForChild("Humanoid")
@@ -2286,6 +2278,9 @@ end
                         end
 
                         local function robContainers()
+                            if isServerHopping then
+                                return
+                            end
                             tweenTo(Vector3.new(1058.7470703125, 5.733738899230957, 2218.6943359375))
                             task.wait(.5)
 
@@ -2427,17 +2422,37 @@ end
 
                         OrionLib:Init()
 
+                        local robBankClubBusy = false
+                        local robContainersBusy = false
+                        local autoCollectBusy = false
+
                         while task.wait() do
-                            if (autorobBankClubToggle or autorobContainersToggle) then
-                                task.spawn(startAutoCollect)
-                            end
+                            if isServerHopping then
+                                task.wait(0.5)
+                            else
+                                if (autorobBankClubToggle or autorobContainersToggle) and not autoCollectBusy then
+                                    autoCollectBusy = true
+                                    task.spawn(function()
+                                        pcall(startAutoCollect)
+                                        autoCollectBusy = false
+                                    end)
+                                end
 
-                            if autorobBankClubToggle == true then
-                                robBankAndClub()
-                            end
+                                if autorobBankClubToggle == true and not robBankClubBusy and not isServerHopping then
+                                    robBankClubBusy = true
+                                    task.spawn(function()
+                                        pcall(robBankAndClub)
+                                        robBankClubBusy = false
+                                    end)
+                                end
 
-                            if autorobContainersToggle == true then
-                                robContainers()
+                                if autorobContainersToggle == true and not robContainersBusy and not isServerHopping then
+                                    robContainersBusy = true
+                                    task.spawn(function()
+                                        pcall(robContainers)
+                                        robContainersBusy = false
+                                    end)
+                                end
                             end
                         end
                     end
