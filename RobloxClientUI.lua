@@ -249,11 +249,9 @@ function OrionLib:IsRunning()
 	return ok and live == true
 end
 
--- Schließen/Minimize: Kein Activated/InputBegan/MouseButton1Down — die können beim GUI-Aufbau
--- oder unter Executors phantom auslösen und sofort performClose ausführen (leeres UI).
--- Debounce zwischen Click und Up verhindert Doppelfire; Xeno nutzt oft zuverlässig MouseButton1Up.
+-- Schließen/Minimize: mehrere Events + Debounce (Executors liefern mal nur Click, mal nur Up, Touch = InputBegan).
 local function BindWinChromeClick(guiButton, callback, debounceSec)
-	debounceSec = debounceSec or 0.22
+	debounceSec = debounceSec or 0.2
 	local gate = false
 	local function runOnce()
 		if gate then
@@ -267,6 +265,16 @@ local function BindWinChromeClick(guiButton, callback, debounceSec)
 	end
 	AddConnection(guiButton.MouseButton1Click, runOnce)
 	AddConnection(guiButton.MouseButton1Up, runOnce)
+	AddConnection(guiButton.MouseButton1Down, runOnce)
+	AddConnection(guiButton.InputBegan, function(input, gameProcessed)
+		if gameProcessed then
+			return
+		end
+		local t = input.UserInputType
+		if t == Enum.UserInputType.MouseButton1 or t == Enum.UserInputType.Touch then
+			runOnce()
+		end
+	end)
 end
 
 local function AddConnection(Signal, Function)
@@ -841,28 +849,32 @@ function OrionLib:MakeWindow(WindowConfig)
 		Size = UDim2.new(0.5, 0, 1, 0),
 		Position = UDim2.new(0.5, 0, 0, 0),
 		BackgroundTransparency = 1,
-		ZIndex = 6,
+		ZIndex = 16,
 		Selectable = true,
 		AutoButtonColor = false
 	}), {
 		AddThemeObject(SetProps(MakeElement("Image", "x"), {
 			Position = UDim2.new(0, 9, 0, 6),
 			Size = UDim2.new(0, 18, 0, 18),
-			Name = "Glyph"
+			Name = "Glyph",
+			Active = false,
+			Selectable = false
 		}), "Text")
 	})
 
 	local MinimizeBtn = SetChildren(SetProps(MakeElement("Button"), {
 		Size = UDim2.new(0.5, 0, 1, 0),
 		BackgroundTransparency = 1,
-		ZIndex = 6,
+		ZIndex = 16,
 		Selectable = true,
 		AutoButtonColor = false
 	}), {
 		AddThemeObject(SetProps(MakeElement("Image", "minus"), {
 			Position = UDim2.new(0, 9, 0, 6),
 			Size = UDim2.new(0, 18, 0, 18),
-			Name = "Ico"
+			Name = "Ico",
+			Active = false,
+			Selectable = false
 		}), "Text")
 	})
 
@@ -1107,7 +1119,7 @@ function OrionLib:MakeWindow(WindowConfig)
 				Position = UDim2.new(1, -98, 0, 8),
 				Name = "WinControls",
 				BackgroundTransparency = 0.44,
-				ZIndex = 5
+				ZIndex = 15
 			}), {
 				AddThemeObject(SetProps(MakeElement("Stroke"), {
 					Transparency = 0.85,
@@ -1704,10 +1716,11 @@ function OrionLib:MakeWindow(WindowConfig)
 		end)
 	end
 
-	task.defer(function()
-		task.wait(0.2)
-		BindWinChromeClick(CloseBtn, performClose)
-		BindWinChromeClick(MinimizeBtn, performMinimize)
+	BindWinChromeClick(CloseBtn, performClose)
+	BindWinChromeClick(MinimizeBtn, performMinimize)
+	pcall(function()
+		CloseBtn.Interactable = true
+		MinimizeBtn.Interactable = true
 	end)
 
 	local function LoadSequence()
