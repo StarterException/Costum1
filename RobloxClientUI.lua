@@ -1,6 +1,3 @@
--- Costum UI — Orion-kompatible API (jensonhirst/Orion); Theme-System, Premium-Extras, Glass-Layout.
--- Referenz: https://raw.githubusercontent.com/jensonhirst/Orion/refs/heads/main/source
-
 local UserInputService = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
 local RunService = game:GetService("RunService")
@@ -182,7 +179,6 @@ local OrionLib = {
 	SaveCfg = false
 }
 
--- Lucide (lucideblox) → rbxassetid — Quelle: https://github.com/frappedevs/lucideblox
 local Icons = {}
 local LUCIDE_FALLBACK = "rbxassetid://7734052925"
 
@@ -236,8 +232,6 @@ else
 	end
 end
 
--- Muss für ALLE gängigen Executor-Setups true liefern (CoreGui, gethui, PlayerGui, verschachtelt).
--- Zu enge Prüfung → AddConnection macht nichts → keine Tab-/Slider-Events, Intro wirkt „tot“.
 function OrionLib:IsRunning()
 	local p = Orion.Parent
 	if not p then
@@ -249,7 +243,6 @@ function OrionLib:IsRunning()
 	return ok and live == true
 end
 
--- Muss VOR BindWinChromeClick stehen: sonst ist AddConnection in manchen Luau-/Executor-Setups beim ersten Aufruf noch nil (Upvalue).
 local function AddConnection(Signal, Function)
 	if not OrionLib:IsRunning() then
 		return
@@ -267,7 +260,6 @@ local function AddConnection(Signal, Function)
 	return nil
 end
 
--- Schließen/Minimize: Click + Up + optional Activated; Gate-Reset mit wait-Fallback (task.wait fehlt manchmal).
 local function BindWinChromeClick(guiButton, callback, debounceSec)
 	if not guiButton or type(callback) ~= "function" then
 		return
@@ -316,7 +308,6 @@ task.spawn(function()
 	end
 end)
 
--- Fenster ziehen: Maus + Touch; Maus nutzt MouseMovement, Touch den gleichen Finger-Input.
 local function AddDraggingFunctionality(DragPoint, Main)
 	local dragging = false
 	local dragUsesTouch = false
@@ -865,7 +856,7 @@ function OrionLib:MakeWindow(WindowConfig)
 	end
 	task.defer(RefreshTabHolderCanvas)
 
-	-- Nur Darstellung; echte Klicks über ChromeCloseHit (darüber, sonst fangen Stroke/Divider/Theme zu).
+	
 	local CloseBtn = SetChildren(SetProps(MakeElement("Button"), {
 		Size = UDim2.new(0.5, 0, 1, 0),
 		Position = UDim2.new(0.5, 0, 0, 0),
@@ -901,7 +892,7 @@ function OrionLib:MakeWindow(WindowConfig)
 		}), "Text")
 	})
 
-	-- Unsichtbare Volltreffer über Minimize (links) / Close (rechts) — WinControls 88px breit ab (1,-98).
+	
 	local ChromeMinHit = SetProps(MakeElement("Button"), {
 		Name = "ChromeMinHit",
 		Text = "",
@@ -925,7 +916,7 @@ function OrionLib:MakeWindow(WindowConfig)
 		Selectable = true
 	})
 
-	-- Nur linker Titelbereich: volle Breite würde die TopBar überdecken und Close/Minimize blockieren.
+	
 	local DragPoint = SetProps(MakeElement("TFrame"), {
 		Size = UDim2.new(1, -368, 0, 54),
 		Position = UDim2.new(0, 0, 0, 0),
@@ -1193,7 +1184,7 @@ function OrionLib:MakeWindow(WindowConfig)
 	MainWindow.BackgroundTransparency = 0.14
 	WindowStuff.BackgroundTransparency = 0.36
 
-	-- Größere Klickfläche (besonders Touch); Ende nur für den Finger / Klick der den Resize gestartet hat.
+	
 	local ResizeGrip = AddThemeObject(SetProps(Create("ImageLabel", {
 		Parent = MainWindow,
 		Name = "ResizeGrip",
@@ -1230,7 +1221,7 @@ function OrionLib:MakeWindow(WindowConfig)
 			resizeBeganInput = nil
 			return
 		end
-		-- Manche Clients liefern bei der Maus ein anderes Input-Objekt beim Loslassen.
+		
 		if resizeBeganInput.UserInputType == Enum.UserInputType.MouseButton1 and input.UserInputType == Enum.UserInputType.MouseButton1 then
 			resizing = false
 			resizeBeganInput = nil
@@ -1800,7 +1791,7 @@ function OrionLib:MakeWindow(WindowConfig)
 				IntroLayer:Destroy()
 			end
 			MainWindow.Visible = true
-			-- Chrome erst nach sichtbarem Fenster binden (verhindert Phantom-Close während Intro/Layout).
+			
 			task.defer(function()
 				task.wait(0.08)
 				ensureWinChromeBinds()
@@ -2024,7 +2015,7 @@ function OrionLib:MakeWindow(WindowConfig)
 			local ElementFunction = {}
 			function ElementFunction:AddLabel(Text)
 				local LAcc = OrionLib.Themes[OrionLib.SelectedTheme].Accent
-				-- Kein Child namens "Content" — in neuen Roblox-Builds ist Frame.Content kein gültiger Kind-Zugriff.
+				
 				local labelTextEl = AddThemeObject(SetProps(MakeElement("Label", Text, 15), {
 					Size = UDim2.new(1, -36, 1, 0),
 					Position = UDim2.new(0, 24, 0, 0),
