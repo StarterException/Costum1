@@ -2163,10 +2163,26 @@ end
                                 if not cam then
                                     return
                                 end
-                                -- festes Third-Person wie lockCamera(): 6 hinten, +5 Kamera-Höhe, Blick auf +2 über Root
-                                local backOffset = focusPart.CFrame.LookVector * -6
-                                local cameraPosition = focusPart.Position + backOffset + Vector3.new(0, 5, 0)
-                                local lookAtPosition = focusPart.Position + Vector3.new(0, 2, 0)
+                                -- Nur XZ-Richtung: volle LookVector zieht die Cam nach oben → Wurf fliegt zu hoch.
+                                local pos = focusPart.Position
+                                local lv = focusPart.CFrame.LookVector
+                                local flat = Vector3.new(lv.X, 0, lv.Z)
+                                if flat.Magnitude < 0.06 then
+                                    flat = Vector3.new(0, 0, -1)
+                                else
+                                    flat = flat.Unit
+                                end
+                                local backOffset = flat * -5.5
+                                local cameraPosition
+                                local lookAtPosition
+                                if inVehicle then
+                                    cameraPosition = pos + backOffset + Vector3.new(0, 2.35, 0)
+                                    lookAtPosition = pos + flat * 14 + Vector3.new(0, 0.65, 0)
+                                else
+                                    -- Zu Fuß: niedrige Cam, Ziel weit **vorne** auf fast gleicher Höhe = flacher Wurf
+                                    cameraPosition = pos + backOffset + Vector3.new(0, 1.45, 0)
+                                    lookAtPosition = pos + flat * 11 + Vector3.new(0, 0.15, 0)
+                                end
                                 cam.CameraType = Enum.CameraType.Scriptable
                                 cam.CFrame = CFrame.new(cameraPosition, lookAtPosition)
                             end)
