@@ -1760,8 +1760,9 @@ end
                             return list
                         end
 
-                        local LOOT_MAX_PASSES = 45
-                        local LOOT_PASS_PAUSE = 0.22
+                        -- Schnell wie früher: erster Durchgang ohne Extra-Wartezeit; nur wenn noch Rest-Parts da sind, kurze Nachläufe
+                        local LOOT_RETRY_MAX = 8
+                        local LOOT_RETRY_GAP = 0.065
 
                         local function interactWithVisibleMeshParts(folder)
                             if not folder or isAborting then
@@ -1774,9 +1775,12 @@ end
                                 return
                             end
 
-                            for _pass = 1, LOOT_MAX_PASSES do
+                            for pass = 1, LOOT_RETRY_MAX do
                                 if isAborting then
                                     return
+                                end
+                                if pass > 1 then
+                                    task.wait(LOOT_RETRY_GAP)
                                 end
                                 local meshParts = gatherLootMeshPartsUnder(folder)
                                 if #meshParts == 0 then
@@ -1824,7 +1828,6 @@ end
                                         recordLootStat(false)
                                     end
                                 end
-                                task.wait(LOOT_PASS_PAUSE)
                             end
                         end
 
@@ -1839,9 +1842,12 @@ end
                                 return
                             end
 
-                            for _pass = 1, LOOT_MAX_PASSES do
+                            for pass = 1, LOOT_RETRY_MAX do
                                 if isAborting then
                                     return
+                                end
+                                if pass > 1 then
+                                    task.wait(LOOT_RETRY_GAP)
                                 end
                                 local meshParts = gatherLootMeshPartsUnder(folder)
                                 if #meshParts == 0 then
@@ -1889,9 +1895,8 @@ end
                                         robRemoteEvent:FireServer(unpack(args4))
                                         recordLootStat(false)
                                     end
-                                    task.wait(0.1)
+                                    task.wait(0.06)
                                 end
-                                task.wait(LOOT_PASS_PAUSE)
                             end
                         end
 
@@ -1906,7 +1911,8 @@ end
 
                             local ProximityPromptTimeBet = 2.5
                             local Range = 32
-                            local AUTO_LOOT_ROUNDS = 14
+                            local AUTO_LOOT_RETRY_MAX = 7
+                            local AUTO_LOOT_RETRY_GAP = 0.07
                             local Robberies = {}
 
                             for _, d in ipairs(Workspace:GetDescendants()) do
@@ -1935,9 +1941,12 @@ end
                                 if not folder or not HumanoidRootPart then
                                     return
                                 end
-                                for _round = 1, AUTO_LOOT_ROUNDS do
+                                for round = 1, AUTO_LOOT_RETRY_MAX do
                                     if not (autorobBankClubToggle or autorobContainersToggle) then
                                         return
+                                    end
+                                    if round > 1 then
+                                        task.wait(AUTO_LOOT_RETRY_GAP)
                                     end
                                     local batch = {}
                                     for _, m in ipairs(folder:GetDescendants()) do
@@ -1966,7 +1975,6 @@ end
                                         robRemoteEvent:FireServer(unpack(a))
                                         recordLootStat(isMoneyLoot)
                                     end
-                                    task.wait(0.28)
                                 end
                             end
 
@@ -1976,7 +1984,7 @@ end
                                         loot(r)
                                     end
                                 end
-                                task.wait(0.45)
+                                task.wait(0.35)
                             end
                         end
 
