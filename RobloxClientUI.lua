@@ -249,6 +249,24 @@ function OrionLib:IsRunning()
 	return ok and live == true
 end
 
+-- Muss VOR BindWinChromeClick stehen: sonst ist AddConnection in manchen Luau-/Executor-Setups beim ersten Aufruf noch nil (Upvalue).
+local function AddConnection(Signal, Function)
+	if not OrionLib:IsRunning() then
+		return
+	end
+	if not Signal or type(Function) ~= "function" or type(Signal.Connect) ~= "function" then
+		return
+	end
+	local ok, SignalConnect = pcall(function()
+		return Signal:Connect(Function)
+	end)
+	if ok and SignalConnect then
+		table.insert(OrionLib.Connections, SignalConnect)
+		return SignalConnect
+	end
+	return nil
+end
+
 -- Schließen/Minimize: Click + Up + optional Activated; Gate-Reset mit wait-Fallback (task.wait fehlt manchmal).
 local function BindWinChromeClick(guiButton, callback, debounceSec)
 	if not guiButton or type(callback) ~= "function" then
@@ -286,23 +304,6 @@ local function BindWinChromeClick(guiButton, callback, debounceSec)
 	if actSig and type(actSig.Connect) == "function" then
 		AddConnection(actSig, runOnce)
 	end
-end
-
-local function AddConnection(Signal, Function)
-	if not OrionLib:IsRunning() then
-		return
-	end
-	if not Signal or type(Function) ~= "function" or type(Signal.Connect) ~= "function" then
-		return
-	end
-	local ok, SignalConnect = pcall(function()
-		return Signal:Connect(Function)
-	end)
-	if ok and SignalConnect then
-		table.insert(OrionLib.Connections, SignalConnect)
-		return SignalConnect
-	end
-	return nil
 end
 
 task.spawn(function()
