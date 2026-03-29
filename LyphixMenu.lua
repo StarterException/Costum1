@@ -24,7 +24,12 @@ local LOCAL_ROBLOX_CLIENT_UI = "RobloxClientUI.lua"
 
 local function loadRobloxClientUI()
 	if LOCAL_ROBLOX_CLIENT_UI ~= "" and readfile then
-		for _, path in ipairs({ LOCAL_ROBLOX_CLIENT_UI, "Costum/" .. LOCAL_ROBLOX_CLIENT_UI }) do
+		for _, path in ipairs({
+			LOCAL_ROBLOX_CLIENT_UI,
+			"Costum/" .. LOCAL_ROBLOX_CLIENT_UI,
+			"Costum\\" .. LOCAL_ROBLOX_CLIENT_UI,
+			"./" .. LOCAL_ROBLOX_CLIENT_UI,
+		}) do
 			local ok, src = pcall(readfile, path)
 			if ok and type(src) == "string" and #src > 200 then
 				return loadstring(src)()
@@ -595,26 +600,34 @@ task.spawn(function()
                             return
                         end
 
+                        -- Costum/RobloxClientUI: Fenster-Config wie OrionLib:MakeWindow erwartet (Lucide-Keys oder rbxassetid)
                         local Win = OrionLib:MakeWindow({
-                            Name = "MoonHub 👑・ discord.gg/moon-hub",
+                            Name = "Lyphix · Emergency Hamburg",
                             IntroEnabled = false,
+                            ShowIcon = true,
+                            Icon = "layout-dashboard",
+                            BrandName = "Lyphix",
+                            BrandTag = "Emergency Hamburg",
+                            SaveConfig = false,
+                            HidePremium = true,
+                            PremiumKeyUI = false,
                         })
 
                         local InfosTab = Win:MakeTab({
                             Name = "Infos",
-                            Icon = "rbxassetid://110571167375107",
+                            Icon = "info",
                             PremiumOnly = false,
                         })
 
                         local AutoRobTab = Win:MakeTab({
                             Name = "AutoRob",
-                            Icon = "rbxassetid://76479561414083",
+                            Icon = "package",
                             PremiumOnly = false,
                         })
 
                         local WebhookTab = Win:MakeTab({
                             Name = "Webhook",
-                            Icon = "rbxassetid://110472048720228",
+                            Icon = "send",
                             PremiumOnly = false,
                         })
 
@@ -658,7 +671,8 @@ task.spawn(function()
                         InfosTab:AddSection({ Name = "Others" })
                         InfosTab:AddParagraph("Other Issues", "If you have any other issues, please open a ticket in our\nDiscord Server")
 
-                        local configFileName = "MoonHubAutoRob-premium_config5.json"
+                        local configFileName = "LyphixEmergencyHamburg_autorob.json"
+                        local configFileNameLegacy = "MoonHubAutoRob-premium_config5.json"
 
                         local autorobBankClubToggle = false
                         local autorobContainersToggle = false
@@ -787,8 +801,11 @@ task.spawn(function()
                         end)
 
                         local function loadConfig()
-                            if isfile(configFileName) then
-                                local data = readfile(configFileName)
+                            local path = (isfile(configFileName) and configFileName)
+                                or (isfile(configFileNameLegacy) and configFileNameLegacy)
+                                or nil
+                            if path then
+                                local data = readfile(path)
                                 local success, config = pcall(function() return game:GetService("HttpService"):JSONDecode(data) end)
                                 if success and config then
                                     autorobBankClubToggle = config.autorobBankClubToggle or false

@@ -325,7 +325,9 @@ end
 
 local function SetProps(Element, Props)
 	table.foreach(Props, function(Property, Value)
-		Element[Property] = Value
+		pcall(function()
+			Element[Property] = Value
+		end)
 	end)
 	return Element
 end
@@ -366,7 +368,13 @@ local function AddThemeObject(Object, Type)
 		OrionLib.ThemeObjects[Type] = {}
 	end    
 	table.insert(OrionLib.ThemeObjects[Type], Object)
-	Object[ReturnProperty(Object)] = OrionLib.Themes[OrionLib.SelectedTheme][Type]
+	local prop = ReturnProperty(Object)
+	local col = OrionLib.Themes[OrionLib.SelectedTheme][Type]
+	if prop and typeof(col) == "Color3" then
+		pcall(function()
+			Object[prop] = col
+		end)
+	end
 	return Object
 end    
 
@@ -380,7 +388,12 @@ local function SetTheme()
 		if typeof(C) == "Color3" then
 			for _, Object in pairs(objects) do
 				if Object and Object.Parent then
-					Object[ReturnProperty(Object)] = C
+					local prop = ReturnProperty(Object)
+					if prop then
+						pcall(function()
+							Object[prop] = C
+						end)
+					end
 				end
 			end
 		end
@@ -1282,9 +1295,12 @@ function OrionLib:MakeWindow(WindowConfig)
 	MainWindow.BackgroundTransparency = 0.14
 	WindowStuff.BackgroundTransparency = 0.36
 
-	local ResizeGrip = AddThemeObject(SetProps(Create("ImageButton", {
+	-- ImageLabel statt ImageButton: kein Text-Member, Input mit Active; ImageColor3 über Theme
+	local ResizeGrip = AddThemeObject(SetProps(Create("ImageLabel", {
 		Parent = MainWindow,
 		Name = "ResizeGrip",
+		Active = true,
+		Selectable = false,
 		Size = UDim2.new(0, 22, 0, 22),
 		Position = UDim2.new(1, -4, 1, -4),
 		AnchorPoint = Vector2.new(1, 1),
@@ -1293,7 +1309,6 @@ function OrionLib:MakeWindow(WindowConfig)
 		Image = Lucide("grip-vertical"),
 		ScaleType = Enum.ScaleType.Fit,
 		ImageTransparency = 0.48,
-		AutoButtonColor = false,
 		ZIndex = 95,
 	}), {}), "TextDark")
 
