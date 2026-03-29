@@ -1291,7 +1291,6 @@ function OrionLib:MakeWindow(WindowConfig)
 		Image = Lucide("grip-vertical"),
 		ScaleType = Enum.ScaleType.Fit,
 		ImageTransparency = 0.48,
-		Text = "",
 		AutoButtonColor = false,
 		ZIndex = 95,
 	}), {}), "TextDark")
