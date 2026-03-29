@@ -1388,6 +1388,30 @@ task.spawn(function()
                             return bombCountIn(who.Backpack) + bombCountIn(who.Character)
                         end
 
+                        local DEALER_TARGET_BOMB_COUNT = 3
+
+                        local function playerHasGoldInInventory(who)
+                            who = who or plr
+                            if not who then
+                                return false
+                            end
+                            local function containerHasGold(container)
+                                if not container then
+                                    return false
+                                end
+                                for _, d in ipairs(container:GetDescendants()) do
+                                    if d:IsA("Tool") then
+                                        local n = string.lower(d.Name)
+                                        if n == "gold" or (string.find(n, "gold", 1, true) ~= nil) then
+                                            return true
+                                        end
+                                    end
+                                end
+                                return false
+                            end
+                            return containerHasGold(who.Backpack) or containerHasGold(who.Character)
+                        end
+
                         local function equipBombToolFromInventory()
                             local char = plr.Character
                             if not char then
@@ -2082,16 +2106,19 @@ end
                             lyphixDealerApproachActive = false
                         end
 
-                        -- Dealer: optional Verkauf + Bomben bis mindestens `minimumBombsRequired` (immer frisch gezählt, kein „blinder“ N-mal-Kauf).
-                        local function performSingleDealerTrip(minimumBombsRequired, includeSell)
-                            minimumBombsRequired = math.max(0, math.floor(tonumber(minimumBombsRequired) or 0))
-                            if minimumBombsRequired == 0 and not includeSell then
+                        -- Dealer: Gold verkaufen nur wenn Auto-Sell an + Gold im Inventar; Bomben auf genau 3 auffüllen (≥3 = kein Kauf).
+                        local function performSingleDealerTrip()
+                            local hasGold = playerHasGoldInInventory()
+                            local doSell = autoSellToggle and hasGold
+                            local bombs = countBombsInInventory()
+                            local needBombs = bombs < DEALER_TARGET_BOMB_COUNT
+                            if not doSell and not needBombs then
                                 return false
                             end
                             ensurePlayerInVehicle()
                             MoveToDealer()
                             task.wait(0.16)
-                            if includeSell then
+                            if doSell then
                                 local argsSell = { [1] = "Gold", [2] = "Dealer" }
                                 sellRemoteEvent:FireServer(unpack(argsSell))
                                 sellRemoteEvent:FireServer(unpack(argsSell))
@@ -2100,11 +2127,11 @@ end
                             end
                             task.wait(0.1)
                             local heldNow = countBombsInInventory()
-                            local toBuy = math.max(0, minimumBombsRequired - heldNow)
+                            local toBuy = math.max(0, DEALER_TARGET_BOMB_COUNT - heldNow)
                             if toBuy > 0 then
                                 local argsBuy = { [1] = "Bomb", [2] = "Dealer" }
                                 for _ = 1, toBuy do
-                                    if countBombsInInventory() >= minimumBombsRequired then
+                                    if countBombsInInventory() >= DEALER_TARGET_BOMB_COUNT then
                                         break
                                     end
                                     buyRemoteEvent:FireServer(unpack(argsBuy))
@@ -2112,7 +2139,7 @@ end
                                     task.wait(0.14)
                                 end
                                 local deadline = os.clock() + 6
-                                while countBombsInInventory() < minimumBombsRequired and os.clock() < deadline do
+                                while countBombsInInventory() < DEALER_TARGET_BOMB_COUNT and os.clock() < deadline do
                                     task.wait(0.05)
                                 end
                             end
@@ -2204,13 +2231,9 @@ end
                             local bankLight2 = workspace.Robberies.BankRobbery.LightRed.Light
                             local JewelerPart = workspace.Robberies["Jeweler Safe Robbery"].Jeweler.Door.Accessory.Black
 
-                            local clubOpenAtPlan = clubPart.Rotation == Vector3.new(180, 0, 180)
-                            local bankOpenAtPlan = bankLight2.Enabled == false and bankLight.Enabled == true
-                            local jewelerOpenAtPlan = (robMode == "Rob Club, Jeweler & Bank") and JewelerPart.Rotation == Vector3.new(0, -90, 0)
-                            local plannedBombRobberies = (clubOpenAtPlan and 1 or 0) + (bankOpenAtPlan and 1 or 0) + (jewelerOpenAtPlan and 1 or 0)
                             local bombsHeld = countBombsInInventory()
-                            if autoSellToggle or bombsHeld < plannedBombRobberies then
-                                performSingleDealerTrip(plannedBombRobberies, autoSellToggle)
+                            if (autoSellToggle and playerHasGoldInInventory()) or bombsHeld < DEALER_TARGET_BOMB_COUNT then
+                                performSingleDealerTrip()
                                 ensurePlayerInVehicle()
                                 tweenTo(Vector3.new(-1370.972412109375, 5.499999046325684, 3127.154541015625))
                             end
@@ -2403,12 +2426,9 @@ end
                                 return
                             end
 
-                            local con1OpenAtPlan = con1Planks.Transparency == 1
-                            local con2OpenAtPlan = con2Planks.Transparency == 1
-                            local containerBombJobs = (con1OpenAtPlan and 1 or 0) + (con2OpenAtPlan and 1 or 0)
                             local contBombsHeld = countBombsInInventory()
-                            if autoSellToggle or contBombsHeld < containerBombJobs then
-                                performSingleDealerTrip(containerBombJobs, autoSellToggle)
+                            if (autoSellToggle and playerHasGoldInInventory()) or contBombsHeld < DEALER_TARGET_BOMB_COUNT then
+                                performSingleDealerTrip()
                                 ensurePlayerInVehicle()
                                 tweenTo(Vector3.new(1058.7470703125, 5.733738899230957, 2218.6943359375))
                             end
