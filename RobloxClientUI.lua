@@ -249,9 +249,9 @@ function OrionLib:IsRunning()
 	return ok and live == true
 end
 
--- Schließen/Minimize: mehrere Events + Debounce (Executors liefern mal nur Click, mal nur Up, Touch = InputBegan).
+-- Nur Click + Up (mit Debounce). Kein InputBegan/MouseButton1Down — triggert unter Executors oft phantom beim Aufbau → UI sofort weg.
 local function BindWinChromeClick(guiButton, callback, debounceSec)
-	debounceSec = debounceSec or 0.2
+	debounceSec = debounceSec or 0.22
 	local gate = false
 	local function runOnce()
 		if gate then
@@ -265,16 +265,6 @@ local function BindWinChromeClick(guiButton, callback, debounceSec)
 	end
 	AddConnection(guiButton.MouseButton1Click, runOnce)
 	AddConnection(guiButton.MouseButton1Up, runOnce)
-	AddConnection(guiButton.MouseButton1Down, runOnce)
-	AddConnection(guiButton.InputBegan, function(input, gameProcessed)
-		if gameProcessed then
-			return
-		end
-		local t = input.UserInputType
-		if t == Enum.UserInputType.MouseButton1 or t == Enum.UserInputType.Touch then
-			runOnce()
-		end
-	end)
 end
 
 local function AddConnection(Signal, Function)
@@ -1668,6 +1658,9 @@ function OrionLib:MakeWindow(WindowConfig)
 	wireWinHover(MinimizeBtn, "Ico")
 
 	local function performClose()
+		if not MainWindow or not MainWindow.Parent then
+			return
+		end
 		MainWindow.Visible = false
 		UIHidden = true
 		OrionLib:MakeNotification({
@@ -1716,12 +1709,19 @@ function OrionLib:MakeWindow(WindowConfig)
 		end)
 	end
 
-	BindWinChromeClick(CloseBtn, performClose)
-	BindWinChromeClick(MinimizeBtn, performMinimize)
-	pcall(function()
-		CloseBtn.Interactable = true
-		MinimizeBtn.Interactable = true
-	end)
+	local winChromeBindsDone = false
+	local function ensureWinChromeBinds()
+		if winChromeBindsDone then
+			return
+		end
+		winChromeBindsDone = true
+		BindWinChromeClick(CloseBtn, performClose)
+		BindWinChromeClick(MinimizeBtn, performMinimize)
+		pcall(function()
+			CloseBtn.Interactable = true
+			MinimizeBtn.Interactable = true
+		end)
+	end
 
 	local function LoadSequence()
 		MainWindow.Visible = false
@@ -1737,6 +1737,11 @@ function OrionLib:MakeWindow(WindowConfig)
 				IntroLayer:Destroy()
 			end
 			MainWindow.Visible = true
+			-- Chrome erst nach sichtbarem Fenster binden (verhindert Phantom-Close während Intro/Layout).
+			task.defer(function()
+				task.wait(0.08)
+				ensureWinChromeBinds()
+			end)
 		end
 		local ok, err = pcall(function()
 			local LoadSequenceLogo = SetProps(MakeElement("Image", WindowConfig.IntroIcon), {
@@ -1800,7 +1805,12 @@ function OrionLib:MakeWindow(WindowConfig)
 
 	if WindowConfig.IntroEnabled then
 		LoadSequence()
-	end	
+	else
+		task.defer(function()
+			task.wait(0.08)
+			ensureWinChromeBinds()
+		end)
+	end
 
 	local TabFunction = {}
 	function TabFunction:MakeTab(TabConfig)
