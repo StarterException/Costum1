@@ -269,35 +269,69 @@ task.spawn(function()
 	end
 end)
 
+-- Fenster ziehen: Maus + Touch; Maus nutzt MouseMovement, Touch den gleichen Finger-Input.
 local function AddDraggingFunctionality(DragPoint, Main)
-	pcall(function()
-		local Dragging, DragInput, MousePos, FramePos = false
-		DragPoint.InputBegan:Connect(function(Input)
-			if Input.UserInputType == Enum.UserInputType.MouseButton1 then
-				Dragging = true
-				MousePos = Input.Position
-				FramePos = Main.Position
+	local dragging = false
+	local dragUsesTouch = false
+	local activeTouchInput = nil
+	local pointerStart = Vector3.zero
+	local frameStartPos = UDim2.new()
 
-				Input.Changed:Connect(function()
-					if Input.UserInputState == Enum.UserInputState.End then
-						Dragging = false
-					end
-				end)
-			end
-		end)
-		DragPoint.InputChanged:Connect(function(Input)
-			if Input.UserInputType == Enum.UserInputType.MouseMovement then
-				DragInput = Input
-			end
-		end)
-		UserInputService.InputChanged:Connect(function(Input)
-			if Input == DragInput and Dragging then
-				local Delta = Input.Position - MousePos
-				TweenService:Create(Main, TweenInfo.new(0.36, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Position  = UDim2.new(FramePos.X.Scale,FramePos.X.Offset + Delta.X, FramePos.Y.Scale, FramePos.Y.Offset + Delta.Y)}):Play()
-			end
-		end)
+	AddConnection(DragPoint.InputBegan, function(input, gameProcessed)
+		if gameProcessed then
+			return
+		end
+		if input.UserInputType == Enum.UserInputType.MouseButton1 then
+			dragging = true
+			dragUsesTouch = false
+			activeTouchInput = nil
+			pointerStart = input.Position
+			frameStartPos = Main.Position
+		elseif input.UserInputType == Enum.UserInputType.Touch then
+			dragging = true
+			dragUsesTouch = true
+			activeTouchInput = input
+			pointerStart = input.Position
+			frameStartPos = Main.Position
+		end
 	end)
-end   
+
+	AddConnection(UserInputService.InputChanged, function(input)
+		if not dragging then
+			return
+		end
+		if dragUsesTouch then
+			if input ~= activeTouchInput or input.UserInputType ~= Enum.UserInputType.Touch then
+				return
+			end
+		elseif input.UserInputType ~= Enum.UserInputType.MouseMovement then
+			return
+		end
+		local delta = input.Position - pointerStart
+		Main.Position = UDim2.new(
+			frameStartPos.X.Scale,
+			frameStartPos.X.Offset + delta.X,
+			frameStartPos.Y.Scale,
+			frameStartPos.Y.Offset + delta.Y
+		)
+	end)
+
+	AddConnection(UserInputService.InputEnded, function(input)
+		if not dragging then
+			return
+		end
+		if dragUsesTouch then
+			if input == activeTouchInput then
+				dragging = false
+				activeTouchInput = nil
+			end
+		else
+			if input.UserInputType == Enum.UserInputType.MouseButton1 then
+				dragging = false
+			end
+		end
+	end)
+end
 
 local function Create(Name, Properties, Children)
 	local Object = Instance.new(Name)
@@ -674,6 +708,7 @@ function OrionLib:MakeWindow(WindowConfig)
 	local resizing = false
 	local resizeStartMouse
 	local resizeStartSize
+	local resizeBeganInput = nil
 	local Loaded = false
 	local UIHidden = false
 
@@ -786,7 +821,10 @@ function OrionLib:MakeWindow(WindowConfig)
 	local CloseBtn = SetChildren(SetProps(MakeElement("Button"), {
 		Size = UDim2.new(0.5, 0, 1, 0),
 		Position = UDim2.new(0.5, 0, 0, 0),
-		BackgroundTransparency = 1
+		BackgroundTransparency = 1,
+		ZIndex = 6,
+		Selectable = true,
+		AutoButtonColor = false
 	}), {
 		AddThemeObject(SetProps(MakeElement("Image", "x"), {
 			Position = UDim2.new(0, 9, 0, 6),
@@ -797,7 +835,10 @@ function OrionLib:MakeWindow(WindowConfig)
 
 	local MinimizeBtn = SetChildren(SetProps(MakeElement("Button"), {
 		Size = UDim2.new(0.5, 0, 1, 0),
-		BackgroundTransparency = 1
+		BackgroundTransparency = 1,
+		ZIndex = 6,
+		Selectable = true,
+		AutoButtonColor = false
 	}), {
 		AddThemeObject(SetProps(MakeElement("Image", "minus"), {
 			Position = UDim2.new(0, 9, 0, 6),
@@ -806,8 +847,13 @@ function OrionLib:MakeWindow(WindowConfig)
 		}), "Text")
 	})
 
+	-- Nur linker Titelbereich: volle Breite würde die TopBar überdecken und Close/Minimize blockieren.
 	local DragPoint = SetProps(MakeElement("TFrame"), {
-		Size = UDim2.new(1, 0, 0, 54)
+		Size = UDim2.new(1, -368, 0, 54),
+		Position = UDim2.new(0, 0, 0, 0),
+		Active = true,
+		ZIndex = 3,
+		Name = "WindowDragStrip"
 	})
 
 	local WindowStuff = AddThemeObject(SetChildren(SetProps(MakeElement("RoundFrame", Color3.fromRGB(255, 255, 255), 0, 20), {
@@ -991,7 +1037,8 @@ function OrionLib:MakeWindow(WindowConfig)
 		end)(),
 		SetChildren(SetProps(MakeElement("TFrame"), {
 			Size = UDim2.new(1, 0, 0, 54),
-			Name = "TopBar"
+			Name = "TopBar",
+			ZIndex = 2
 		}), {
 			PremiumCrown,
 			WindowName,
@@ -1040,7 +1087,8 @@ function OrionLib:MakeWindow(WindowConfig)
 				Size = UDim2.new(0, 88, 0, 38),
 				Position = UDim2.new(1, -98, 0, 8),
 				Name = "WinControls",
-				BackgroundTransparency = 0.44
+				BackgroundTransparency = 0.44,
+				ZIndex = 5
 			}), {
 				AddThemeObject(SetProps(MakeElement("Stroke"), {
 					Transparency = 0.85,
@@ -1063,20 +1111,20 @@ function OrionLib:MakeWindow(WindowConfig)
 	MainWindow.BackgroundTransparency = 0.14
 	WindowStuff.BackgroundTransparency = 0.36
 
-	-- ImageLabel statt ImageButton: kein Text-Member, Input mit Active; ImageColor3 über Theme
+	-- Größere Klickfläche (besonders Touch); Ende nur für den Finger / Klick der den Resize gestartet hat.
 	local ResizeGrip = AddThemeObject(SetProps(Create("ImageLabel", {
 		Parent = MainWindow,
 		Name = "ResizeGrip",
 		Active = true,
 		Selectable = false,
-		Size = UDim2.new(0, 22, 0, 22),
-		Position = UDim2.new(1, -4, 1, -4),
+		Size = UDim2.new(0, 40, 0, 40),
+		Position = UDim2.new(1, -2, 1, -2),
 		AnchorPoint = Vector2.new(1, 1),
 		BackgroundTransparency = 1,
 		BorderSizePixel = 0,
 		Image = Lucide("grip-vertical"),
 		ScaleType = Enum.ScaleType.Fit,
-		ImageTransparency = 0.48,
+		ImageTransparency = 0.42,
 		ZIndex = 95,
 	}), {}), "TextDark")
 
@@ -1086,23 +1134,42 @@ function OrionLib:MakeWindow(WindowConfig)
 				return
 			end
 			resizing = true
+			resizeBeganInput = input
 			resizeStartMouse = input.Position
 			resizeStartSize = MainWindow.AbsoluteSize
 		end
 	end)
 	AddConnection(UserInputService.InputEnded, function(input)
-		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+		if not resizing or not resizeBeganInput then
+			return
+		end
+		if input == resizeBeganInput then
 			resizing = false
+			resizeBeganInput = nil
+			return
+		end
+		-- Manche Clients liefern bei der Maus ein anderes Input-Objekt beim Loslassen.
+		if resizeBeganInput.UserInputType == Enum.UserInputType.MouseButton1 and input.UserInputType == Enum.UserInputType.MouseButton1 then
+			resizing = false
+			resizeBeganInput = nil
 		end
 	end)
 	AddConnection(UserInputService.InputChanged, function(input)
-		if not resizing then
+		if not resizing or not resizeBeganInput then
 			return
 		end
 		if Minimized then
 			return
 		end
-		if input.UserInputType ~= Enum.UserInputType.MouseMovement and input.UserInputType ~= Enum.UserInputType.Touch then
+		if input.UserInputType == Enum.UserInputType.Touch then
+			if input ~= resizeBeganInput then
+				return
+			end
+		elseif input.UserInputType == Enum.UserInputType.MouseMovement then
+			if resizeBeganInput.UserInputType ~= Enum.UserInputType.MouseButton1 then
+				return
+			end
+		else
 			return
 		end
 		local d = input.Position - resizeStartMouse
@@ -1569,44 +1636,59 @@ function OrionLib:MakeWindow(WindowConfig)
 	wireWinHover(CloseBtn, "Glyph")
 	wireWinHover(MinimizeBtn, "Ico")
 
-	AddConnection(CloseBtn.MouseButton1Up, function()
+	local function performClose()
 		MainWindow.Visible = false
 		UIHidden = true
 		OrionLib:MakeNotification({
 			Name = "Interface Hidden",
-			Content = "Tap RightShift to reopen the interface",
+			Content = "Press RightShift to reopen the interface",
 			Time = 5
 		})
 		WindowConfig.CloseCallback()
-	end)
+	end
+
+	-- Activated: zuverlässig für Maus, Touch und Gamepad (nicht doppelt mit MouseButton1Click kombinieren).
+	AddConnection(CloseBtn.Activated, performClose)
 
 	AddConnection(UserInputService.InputBegan, function(Input)
 		if Input.KeyCode == Enum.KeyCode.RightShift and UIHidden then
 			MainWindow.Visible = true
+			UIHidden = false
 		end
 	end)
 
-	AddConnection(MinimizeBtn.MouseButton1Up, function()
-		if Minimized then
-			TweenService:Create(MainWindow, TweenInfo.new(0.5, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Size = UDim2.fromOffset(userWinW, userWinH)}):Play()
-			MinimizeBtn.Ico.Image = Lucide("minus")
-			wait(.02)
-			MainWindow.ClipsDescendants = false
-			WindowStuff.Visible = true
-			WindowTopBarLine.Visible = true
-		else
-			userWinW = math.floor(MainWindow.AbsoluteSize.X + 0.5)
-			userWinH = math.floor(MainWindow.AbsoluteSize.Y + 0.5)
-			MainWindow.ClipsDescendants = true
-			WindowTopBarLine.Visible = false
-			MinimizeBtn.Ico.Image = Lucide("square")
-
-			TweenService:Create(MainWindow, TweenInfo.new(0.5, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Size = UDim2.new(0, WindowName.TextBounds.X + 176, 0, 54)}):Play()
-			wait(0.1)
-			WindowStuff.Visible = false	
+	local minimizeBusy = false
+	local function performMinimize()
+		if minimizeBusy then
+			return
 		end
-		Minimized = not Minimized    
-	end)
+		minimizeBusy = true
+		task.spawn(function()
+			pcall(function()
+				if Minimized then
+					TweenService:Create(MainWindow, TweenInfo.new(0.5, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Size = UDim2.fromOffset(userWinW, userWinH)}):Play()
+					MinimizeBtn.Ico.Image = Lucide("minus")
+					task.wait(0.02)
+					MainWindow.ClipsDescendants = false
+					WindowStuff.Visible = true
+					WindowTopBarLine.Visible = true
+				else
+					userWinW = math.floor(MainWindow.AbsoluteSize.X + 0.5)
+					userWinH = math.floor(MainWindow.AbsoluteSize.Y + 0.5)
+					MainWindow.ClipsDescendants = true
+					WindowTopBarLine.Visible = false
+					MinimizeBtn.Ico.Image = Lucide("square")
+					TweenService:Create(MainWindow, TweenInfo.new(0.5, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Size = UDim2.new(0, WindowName.TextBounds.X + 176, 0, 54)}):Play()
+					task.wait(0.1)
+					WindowStuff.Visible = false
+				end
+				Minimized = not Minimized
+			end)
+			minimizeBusy = false
+		end)
+	end
+
+	AddConnection(MinimizeBtn.Activated, performMinimize)
 
 	local function LoadSequence()
 		MainWindow.Visible = false
