@@ -1492,12 +1492,13 @@ task.spawn(function()
                         local currentPlrTween = nil
                         -- Police-Evakuierung: trotz isAborting Fahrzeug-Tween zur Hop-Position erlauben
                         local policeEvacToHopActive = false
+                        local lyphixDealerApproachActive = false
 
 tweenTo = function(destination)
     if isAborting and not policeEvacToHopActive then
         return
     end
-    if not policeEvacToHopActive then
+    if not policeEvacToHopActive and not lyphixDealerApproachActive then
         clickAtCoordinates(0.45, 0.34)
         clickAtCoordinates(0.5, 0.9)
     end
@@ -1558,7 +1559,7 @@ tweenTo = function(destination)
     vehicle:PivotTo(CFrame.new(Vector3.new(pivotNow.X, lowY, pivotNow.Z)))
     driveSeat.AssemblyLinearVelocity  = Vector3.zero
     driveSeat.AssemblyAngularVelocity = Vector3.zero
-    task.wait(0.05)
+    task.wait(lyphixDealerApproachActive and 0.02 or 0.05)
 
     if not teleportActive or (isAborting and not policeEvacToHopActive) then
         teleportActive = false
@@ -1571,7 +1572,8 @@ tweenTo = function(destination)
         local flatDelta = endFlat - startFlat
         local flatDist = flatDelta.Magnitude
         local flatDir = flatDist > 0.05 and flatDelta.Unit or Vector3.new(0, 0, -1)
-        local tweenDuration = math.max(flatDist / vehicleSpeedDivider, 0.06)
+        local dealerMul = lyphixDealerApproachActive and 2.6 or 1
+        local tweenDuration = math.max(flatDist / (vehicleSpeedDivider * dealerMul), lyphixDealerApproachActive and 0.035 or 0.06)
         local t0 = os.clock()
 
         while true do
@@ -2076,8 +2078,10 @@ end
                                 return
                             end
 
-                            local destination1 = closest.Position + Vector3.new(0, 5, 0)
-                            tweenTo(destination1)
+                            local destination1 = closest.Position + Vector3.new(0, 2.5, 0)
+                            lyphixDealerApproachActive = true
+                            pcall(tweenTo, destination1)
+                            lyphixDealerApproachActive = false
                         end
 
                         local function buyBombFromDealerIfNeeded()
@@ -2086,15 +2090,15 @@ end
                             end
                             ensurePlayerInVehicle()
                             MoveToDealer()
-                            task.wait(0.16)
+                            task.wait(0.03)
                             local argsBuy = { [1] = "Bomb", [2] = "Dealer" }
                             buyRemoteEvent:FireServer(unpack(argsBuy))
                             recordBombPurchase()
-                            local deadline = os.clock() + 4.5
+                            local deadline = os.clock() + 2.2
                             while not playerHasBombInInventory() and os.clock() < deadline do
-                                task.wait(0.05)
+                                task.wait(0.03)
                             end
-                            task.wait(0.08)
+                            task.wait(0.02)
                         end
 
                         local function robBankAndClub()
@@ -2135,12 +2139,12 @@ end
                             if autoSellToggle == true then
                                 ensurePlayerInVehicle()
                                 MoveToDealer()
-                                task.wait(0.14)
+                                task.wait(0.03)
                                 local args = { [1] = "Gold", [2] = "Dealer" }
                                 sellRemoteEvent:FireServer(unpack(args))
                                 sellRemoteEvent:FireServer(unpack(args))
                                 sellRemoteEvent:FireServer(unpack(args))
-                                task.wait(0.08)
+                                task.wait(0.04)
                                 tweenTo(Vector3.new(-1370.972412109375, 5.499999046325684, 3127.154541015625))
                             end
 
