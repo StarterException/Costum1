@@ -1619,12 +1619,32 @@ task.spawn(function()
 
                             if vehicle and character then
                                 local humanoid = character:FindFirstChildWhichIsA("Humanoid")
-                                local driveSeat = vehicle:FindFirstChild("DriveSeat")
+                                local driveSeat = vehicle:FindFirstChild("DriveSeat", true)
+                                    or vehicle:FindFirstChildWhichIsA("VehicleSeat", true)
 
                                 if humanoid and driveSeat and humanoid.SeatPart ~= driveSeat then
                                     driveSeat:Sit(humanoid)
                                 end
                             end
+                        end
+
+                        local function ensurePlayerInVehicleWithRetries(maxAttempts)
+                            maxAttempts = maxAttempts or 28
+                            for _ = 1, maxAttempts do
+                                ensurePlayerInVehicle()
+                                local char = plr.Character
+                                local vehicle = workspace.Vehicles and workspace.Vehicles:FindFirstChild(plr.Name)
+                                if char and vehicle then
+                                    local hum = char:FindFirstChildWhichIsA("Humanoid")
+                                    local driveSeat = vehicle:FindFirstChild("DriveSeat", true)
+                                        or vehicle:FindFirstChildWhichIsA("VehicleSeat", true)
+                                    if hum and driveSeat and hum.SeatPart == driveSeat then
+                                        return true
+                                    end
+                                end
+                                task.wait(0.12)
+                            end
+                            return false
                         end
 
                         -- Sofort Fahrzeug setzen (kein langes tweenTo) — z. B. Police-Abort: an Server-Hop-Punkt bleiben
@@ -1633,13 +1653,17 @@ task.spawn(function()
                         end
 
                         local currentPlrTween = nil
+                        -- Police-Evakuierung: trotz isAborting Fahrzeug-Tween zur Hop-Position erlauben
+                        local policeEvacToHopActive = false
 
 tweenTo = function(destination)
-    if isAborting then
+    if isAborting and not policeEvacToHopActive then
         return
     end
-    clickAtCoordinates(0.45, 0.34)
-    clickAtCoordinates(0.5, 0.9)
+    if not policeEvacToHopActive then
+        clickAtCoordinates(0.45, 0.34)
+        clickAtCoordinates(0.5, 0.9)
+    end
     if teleportActive then
         stopCurrentTween()
     end
@@ -1675,7 +1699,10 @@ tweenTo = function(destination)
         driveSeat:Sit(humanoid)
         local t = 0
         while humanoid.SeatPart ~= driveSeat and t < 15 do
-            if not teleportActive then return end
+            if not teleportActive or (isAborting and not policeEvacToHopActive) then
+                teleportActive = false
+                return
+            end
             task.wait(0.1)
             t = t + 1
         end
@@ -1696,7 +1723,10 @@ tweenTo = function(destination)
     driveSeat.AssemblyAngularVelocity = Vector3.zero
     task.wait(0.05)
 
-    if not teleportActive then return end
+    if not teleportActive or (isAborting and not policeEvacToHopActive) then
+        teleportActive = false
+        return
+    end
 
     if distance > 0.5 then
         local startFlat = Vector3.new(pivotNow.X, lowY, pivotNow.Z)
@@ -1708,7 +1738,7 @@ tweenTo = function(destination)
         local t0 = os.clock()
 
         while true do
-            if isAborting or not teleportActive then
+            if (isAborting and not policeEvacToHopActive) or not teleportActive then
                 teleportActive = false
                 currentTween = nil
                 if currentTweenConn then
@@ -1733,7 +1763,7 @@ tweenTo = function(destination)
         end
     end
 
-    if isAborting or not teleportActive then
+    if (isAborting and not policeEvacToHopActive) or not teleportActive then
         teleportActive = false
         currentTween = nil
         return
@@ -1907,12 +1937,33 @@ end
                                                 currentPlrTween = nil
                                             end
                                         end)
-                                        pcall(ensurePlayerInVehicle)
                                         task.wait(0.1)
-                                        pcall(function()
-                                            snapVehicleToPosition(SERVER_HOP_SAFE_POSITION)
+                                        ensurePlayerInVehicleWithRetries(30)
+                                        task.wait(0.15)
+                                        policeEvacToHopActive = true
+                                        local tweenOk, tweenErr = pcall(function()
+                                            tweenTo(SERVER_HOP_SAFE_POSITION)
                                         end)
-                                        task.wait(0.4)
+                                        policeEvacToHopActive = false
+                                        if not tweenOk then
+                                            warn("[Police Evac] tweenTo failed: " .. tostring(tweenErr))
+                                        end
+                                        local needsSnap = not tweenOk
+                                        if not needsSnap then
+                                            local vehiclesFolder = workspace:FindFirstChild("Vehicles")
+                                            local v = vehiclesFolder and vehiclesFolder:FindFirstChild(plr.Name)
+                                            local seat = v and (v:FindFirstChild("DriveSeat", true) or v:FindFirstChildWhichIsA("VehicleSeat", true))
+                                            if seat then
+                                                needsSnap = (seat.Position - SERVER_HOP_SAFE_POSITION).Magnitude > 45
+                                            else
+                                                needsSnap = true
+                                            end
+                                        end
+                                        if needsSnap then
+                                            pcall(lyphixSnapVehicleToPosition, SERVER_HOP_SAFE_POSITION)
+                                        end
+                                        task.wait(0.35)
+                                        isAborting = false
                                         if performServerHop then
                                             pcall(performServerHop)
                                         end
