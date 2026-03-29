@@ -19,6 +19,20 @@ local HttpService = game:GetService("HttpService")
 -- Costum UI (Orion-kompatibel) + Skript für queue_on_teleport (nach Server-Wechsel erneut ausführen)
 local COSTUM_UI_URL = "https://raw.githubusercontent.com/StarterException/Costum1/refs/heads/main/RobloxClientUI.lua"
 local LYPHIX_MENU_SCRIPT_URL = "https://raw.githubusercontent.com/StarterException/Costum1/refs/heads/main/LyphixMenu.lua"
+-- Wenn readfile verfügbar: zuerst diese lokale Datei nutzen (immer aktuell, kein veraltetes GitHub).
+local LOCAL_ROBLOX_CLIENT_UI = "RobloxClientUI.lua"
+
+local function loadRobloxClientUI()
+	if LOCAL_ROBLOX_CLIENT_UI ~= "" and readfile then
+		for _, path in ipairs({ LOCAL_ROBLOX_CLIENT_UI, "Costum/" .. LOCAL_ROBLOX_CLIENT_UI }) do
+			local ok, src = pcall(readfile, path)
+			if ok and type(src) == "string" and #src > 200 then
+				return loadstring(src)()
+			end
+		end
+	end
+	return loadstring(game:HttpGet(COSTUM_UI_URL))()
+end
 
 local function lyphixTeleportAutoExecPayload()
 	return string.format("loadstring(game:HttpGet(%q))()", LYPHIX_MENU_SCRIPT_URL)
@@ -573,7 +587,7 @@ task.spawn(function()
 
                         local OrionLib
                         local success, err = pcall(function()
-                            OrionLib = loadstring(game:HttpGet(COSTUM_UI_URL))()
+                            OrionLib = loadRobloxClientUI()
                         end)
                         
                         if not success or not OrionLib then

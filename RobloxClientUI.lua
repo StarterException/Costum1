@@ -302,7 +302,9 @@ end
 local function Create(Name, Properties, Children)
 	local Object = Instance.new(Name)
 	for i, v in next, Properties or {} do
-		Object[i] = v
+		pcall(function()
+			Object[i] = v
+		end)
 	end
 	for i, v in next, Children or {} do
 		v.Parent = Object
