@@ -236,30 +236,17 @@ else
 	end
 end
 
+-- Muss für ALLE gängigen Executor-Setups true liefern (CoreGui, gethui, PlayerGui, verschachtelt).
+-- Zu enge Prüfung → AddConnection macht nichts → keine Tab-/Slider-Events, Intro wirkt „tot“.
 function OrionLib:IsRunning()
 	local p = Orion.Parent
 	if not p then
 		return false
 	end
-	local CoreGui = game:GetService("CoreGui")
-	if gethui then
-		local ok, h = pcall(gethui)
-		if ok and h and typeof(h) == "Instance" then
-			local ok2, under = pcall(function()
-				return p == h or p:IsDescendantOf(h)
-			end)
-			if ok2 and under then
-				return true
-			end
-		end
-	end
-	if p == CoreGui then
-		return true
-	end
-	local ok3, inCoreGuiTree = pcall(function()
-		return p:IsDescendantOf(CoreGui)
+	local ok, live = pcall(function()
+		return game:IsAncestorOf(p)
 	end)
-	return ok3 and inCoreGuiTree
+	return ok and live == true
 end
 
 -- Schließen/Minimize: Kein Activated/InputBegan/MouseButton1Down — die können beim GUI-Aufbau
