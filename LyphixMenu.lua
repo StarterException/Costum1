@@ -228,32 +228,45 @@ local TeleportService = game:GetService("TeleportService")
 local SERVER_HISTORY_FILE = "ServerHistory.json"
 local MAX_HISTORY_SIZE = 20
 
-local CONFIG_FILE = "premium_config.json"
+-- Dieselben Dateien wie im Menü-Block; Webhook muss von hier aus geladen werden (Server-Hop vor UI).
+local CONFIG_AUTOROB = "LyphixEmergencyHamburg_autorob.json"
+local CONFIG_AUTOROB_LEGACY = "MoonHubAutoRob-premium_config5.json"
+local CONFIG_WEBHOOK_FALLBACK = "premium_config.json"
+
+local function trimStr(s)
+	if s == nil then
+		return ""
+	end
+	return (tostring(s):gsub("^%s+", ""):gsub("%s+$", ""))
+end
+
 local webhookUrl = ""
 
-local function loadConfig()
-    if isfile(CONFIG_FILE) then
-        local success, data = pcall(function()
-            return HttpService:JSONDecode(readfile(CONFIG_FILE))
-        end)
-        if success and type(data) == "table" then
-            webhookUrl = data.webhookUrl or ""
-        end
-    end
+local function loadWebhookFromFiles()
+	if not (isfile and readfile) then
+		return
+	end
+	for _, path in ipairs({
+		CONFIG_AUTOROB,
+		CONFIG_AUTOROB_LEGACY,
+		CONFIG_WEBHOOK_FALLBACK,
+	}) do
+		if isfile(path) then
+			local ok, data = pcall(function()
+				return HttpService:JSONDecode(readfile(path))
+			end)
+			if ok and type(data) == "table" and data.webhookUrl ~= nil then
+				local w = trimStr(data.webhookUrl)
+				if w ~= "" then
+					webhookUrl = w
+					return
+				end
+			end
+		end
+	end
 end
 
-local function saveConfig()
-    if writefile then
-        local config = {
-            webhookUrl = webhookUrl
-        }
-        pcall(function()
-            writefile(CONFIG_FILE, HttpService:JSONEncode(config))
-        end)
-    end
-end
-
-loadConfig()
+loadWebhookFromFiles()
 
 local function loadServerHistory()
     if isfile and isfile(SERVER_HISTORY_FILE) then
@@ -356,84 +369,136 @@ local function findNewServer()
 end
 
 local function sendEndReport()
-    local p = game.Players.LocalPlayer
-    if p then
-        local playerGui = p:FindFirstChild("PlayerGui")
-        if playerGui then
-            for _, e in pairs(playerGui:GetDescendants()) do
-                if (e:IsA("TextLabel") or e:IsA("TextButton") or e:IsA("TextBox")) and e.Text then
-                    if string.find(e.Text, "€") then
-                        local amount = string.match(e.Text, "([%d%.]+[kKmM]?)%s*€")
-                        if amount then 
-                            webhookStats.currentBalance = amount
-                            break
-                        end
-                    end
-                end
-            end
-        end
-    end
+	local p = game.Players.LocalPlayer
+	if p then
+		local playerGui = p:FindFirstChild("PlayerGui")
+		if playerGui then
+			for _, e in pairs(playerGui:GetDescendants()) do
+				if (e:IsA("TextLabel") or e:IsA("TextButton") or e:IsA("TextBox")) and e.Text then
+					if string.find(e.Text, "€") then
+						local amount = string.match(e.Text, "([%d%.]+[kKmM]?)%s*€")
+						if amount then
+							webhookStats.currentBalance = amount
+							break
+						end
+					end
+				end
+			end
+		end
+	end
 
-    if webhookUrl == "" then return false end
+	local url = trimStr(webhookUrl)
+	if url == "" then
+		return false
+	end
 
-    local playerName = player.Name
-    local serverId = game.JobId
+	local playerName = p and p.Name or "Unknown"
+	local userId = p and p.UserId or 0
+	local jobId = tostring(game.JobId or "")
+	local placeId = game.PlaceId
+	local playersSvc = game:GetService("Players")
+	local playing = #playersSvc:GetPlayers()
 
-    local data = {
-        content = "",
-        embeds = {{
-            title = "MoonHub AutoRob 👑",
-            color = 8947,
-            description = "**Session Report**",
-            fields = {
-                {
-                    name = "Statistics",
-                    value = string.format(
-                        "> **Bombs Purchased:** %d\n> **Safes Robbed:** %d\n> **Already Robbed:** %d\n> **Current Money:** %s €",
-                        webhookStats.bombsPurchased,
-                        webhookStats.safesRobbed,
-                        webhookStats.alreadyRobbedIgnored,
-                        webhookStats.currentBalance
-                    ),
-                    inline = true
-                },
-                {
-                    name = "Player Info",
-                    value = string.format(
-                        "> **Name:** %s\n> **Game:** Emergency Hamburg\n> **Server ID:** %s",
-                        playerName,
-                        serverId
-                    ),
-                    inline = true
-                }
-            },
-            footer = { text = "MoonHub Premium | .gg/moon-hub" },
-            timestamp = os.date("!%Y-%m-%dT%H:%M:%SZ")
-        }}
-    }
+	local headshot = string.format(
+		"https://www.roblox.com/headshot-thumbnail/image?userId=%d&width=180&height=180&format=png",
+		userId
+	)
+	local profileUrl = string.format("https://www.roblox.com/users/%d/profile", userId)
+	local gameUrl = string.format("https://www.roblox.com/games/%d", placeId)
 
-    local encoded = HttpService:JSONEncode(data)
-    
-    local requestFunc = request or http_request or (syn and syn.request) or (fluxus and fluxus.request)
-    
-    if requestFunc then
-        local success, response = pcall(function()
-            return requestFunc({
-                Url = webhookUrl,
-                Method = "POST",
-                Headers = {["Content-Type"] = "application/json"},
-                Body = encoded
-            })
-        end)
-        if not success then 
-            warn("Failed to send webhook: " .. tostring(response)) 
-            return false 
-        end
-        return true
-    else
-        warn("ERROR: No HTTP request function available. Webhooks will not work.")
-        return false
-    end
+	-- Farbe passend zum Menü-Akzent (ca. RGB 138, 95, 255)
+	local embedColor = 9068543
+
+	local payload = {
+		username = "Lyphix · Emergency Hamburg",
+		avatar_url = headshot,
+		embeds = {
+			{
+				author = {
+					name = "Lyphix · Emergency Hamburg",
+					url = gameUrl,
+					icon_url = headshot,
+				},
+				title = "AutoRob · Sitzungsbericht",
+				url = gameUrl,
+				description = string.format(
+					"Neuer Bericht von **%s** — Statistik zum Zeitpunkt des Events (Teleport / Server-Wechsel / Ende).",
+					playerName
+				),
+				color = embedColor,
+				thumbnail = {
+					url = headshot,
+				},
+				fields = {
+					{
+						name = "Statistik",
+						value = string.format(
+							"**Bomben gekauft:** `%d`\n**Safes ausgeraubt:** `%d`\n**Bereits geleert (ignoriert):** `%d`\n**Kontostand (UI):** `%s €`",
+							webhookStats.bombsPurchased,
+							webhookStats.safesRobbed,
+							webhookStats.alreadyRobbedIgnored,
+							tostring(webhookStats.currentBalance)
+						),
+						inline = false,
+					},
+					{
+						name = "Spieler",
+						value = string.format(
+							"**Name:** [%s](%s)\n**UserId:** `%d`",
+							playerName,
+							profileUrl,
+							userId
+						),
+						inline = true,
+					},
+					{
+						name = "Server",
+						value = string.format(
+							"**PlaceId:** `%d`\n**JobId:** `%s`\n**Spieler online:** `%d`\n**Spiel:** Emergency Hamburg",
+							placeId,
+							jobId,
+							playing
+						),
+						inline = true,
+					},
+				},
+				footer = {
+					text = "Lyphix · Emergency Hamburg · AutoRob",
+				},
+				timestamp = os.date("!%Y-%m-%dT%H:%M:%SZ"),
+			},
+		},
+	}
+
+	local encoded = HttpService:JSONEncode(payload)
+	local requestFunc = request or http_request or (syn and syn.request) or (fluxus and fluxus.request)
+
+	if not requestFunc then
+		warn("ERROR: Keine HTTP-Request-Funktion — Webhook nicht möglich.")
+		return false
+	end
+
+	local ok, response = pcall(function()
+		return requestFunc({
+			Url = url,
+			Method = "POST",
+			Headers = { ["Content-Type"] = "application/json" },
+			Body = encoded,
+		})
+	end)
+
+	if not ok then
+		warn("[Webhook] Request fehlgeschlagen: " .. tostring(response))
+		return false
+	end
+
+	local status = tonumber(response and (response.StatusCode or response.statusCode or response.Status))
+	if status and (status < 200 or status >= 300) then
+		warn("[Webhook] HTTP " .. tostring(status) .. (response.Body and (": " .. tostring(response.Body):sub(1, 200)) or ""))
+		return false
+	end
+
+	return true
 end
 
 local isServerHopping = false
@@ -671,8 +736,8 @@ task.spawn(function()
                         InfosTab:AddSection({ Name = "Others" })
                         InfosTab:AddParagraph("Other Issues", "If you have any other issues, please open a ticket in our\nDiscord Server")
 
-                        local configFileName = "LyphixEmergencyHamburg_autorob.json"
-                        local configFileNameLegacy = "MoonHubAutoRob-premium_config5.json"
+                        local configFileName = CONFIG_AUTOROB
+                        local configFileNameLegacy = CONFIG_AUTOROB_LEGACY
 
                         local autorobBankClubToggle = false
                         local autorobContainersToggle = false
@@ -827,6 +892,9 @@ task.spawn(function()
                                     if config.robMode ~= nil then
                                         robMode = config.robMode
                                     end
+                                    if config.webhookUrl ~= nil then
+                                        webhookUrl = trimStr(config.webhookUrl)
+                                    end
                                 end
                             end
                         end
@@ -843,11 +911,15 @@ task.spawn(function()
                                 bombDetectionEnabled = bombDetectionEnabled,
                                 invisibleEnabled = invisibleEnabled,
                                 autoRejoin = autoRejoin,
-                                webhookUrl = webhookUrl,
+                                webhookUrl = trimStr(webhookUrl),
                                 robMode = robMode
                             }
                             local json = game:GetService("HttpService"):JSONEncode(config)
-                            writefile(configFileName, json)
+                            if writefile then
+                                pcall(function()
+                                    writefile(configFileName, json)
+                                end)
+                            end
                         end
 
                         loadConfig()
@@ -864,7 +936,7 @@ task.spawn(function()
                             Default = webhookUrl,
                             TextDisappear = true,
                             Callback = function(Value)
-                                webhookUrl = Value
+                                webhookUrl = trimStr(Value)
                                 saveConfig()
                             end
                         })
