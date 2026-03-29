@@ -2426,6 +2426,7 @@ end
                             local JewelerPos = Vector3.new(-426.5001220703125, 21.522781372070312, 3576.979248046875)
                             local JewelerStand = Vector3.new(-439.0592041015625, 21.223413467407227, 3553.52783203125)
                             local JewelerSafe = Vector3.new(-407.1869201660156, 21.223413467407227, 3551.096435546875)
+                            local JewelerHopPos = Vector3.new(-1292.9005126953125, -423.63556671142578, 3685.330810546875)
 
                             if robMode == "Rob Club, Jeweler & Bank" then
                                 if JewelerPart.Rotation == Vector3.new(0, -90, 0) then
@@ -2434,38 +2435,62 @@ end
                                         Text = "Going to rob",
                                     })
 
+                                    local hasBomb = (plr.Character and plr.Character:FindFirstChild("Bomb")) or plr.Backpack:FindFirstChild("Bomb")
+                                    if not hasBomb then
+                                        ensurePlayerInVehicle()
+                                        MoveToDealer()
+                                        task.wait(0.5)
+                                        local argsDealerBomb = { [1] = "Bomb", [2] = "Dealer" }
+                                        buyRemoteEvent:FireServer(unpack(argsDealerBomb))
+                                        recordBombPurchase()
+                                        task.wait(0.5)
+                                    end
+
                                     ensurePlayerInVehicle()
                                     tweenTo(JewelerPos)
                                     task.wait(0.5)
                                     JumpOut()
                                     task.wait(0.5)
 
-                                    plrTween(JewelerPos)
-                                    task.wait(0.42)
-                                    local jChar = player.Character
-                                    local jHrp = jChar and jChar:FindFirstChild("HumanoidRootPart")
-                                    if jHrp then
-                                        local jp = jHrp.Position
-                                        jHrp.CFrame = CFrame.lookAt(jp, Vector3.new(JewelerSafe.X, jp.Y, JewelerSafe.Z))
+                                    plrTween(Vector3.new(-437.28814697265625, 21.223413467407227, 3553.262939453125))
+                                    task.wait(0.5)
+
+                                    setRobBankCameraLockSuspended(true)
+                                    local bombOk, bombErr = pcall(function()
+                                        local argsEquip = { [1] = "Bomb" }
+                                        EquipRemoteEvent:FireServer(unpack(argsEquip))
+                                        task.wait(0.5)
+
+                                        local tool = plr.Character and plr.Character:FindFirstChild("Bomb")
+                                        if tool then
+                                            SpawnBomb()
+                                        else
+                                            warn("Tool 'Bomb' not found in the backpack!")
+                                        end
+
+                                        task.wait(0.5)
+                                        fireBombRemoteEvent:FireServer()
+                                    end)
+                                    setRobBankCameraLockSuspended(false)
+                                    if not bombOk then
+                                        warn("[Jeweler] Bomb throw: " .. tostring(bombErr))
                                     end
-                                    task.wait(0.14)
 
-                                    runBombThrowSequence()
-
-                                    plrTween(JewelerStand)
-                                    task.wait(2.7)
                                     plrTween(JewelerSafe)
+                                    task.wait(2.7)
+                                    plrTween(JewelerStand)
 
                                     startPoliceMonitoring("Jeweler")
 
                                     local safeFolder = workspace.Robberies["Jeweler Safe Robbery"].Jeweler
-                                    lootSafeUntilClear(safeFolder:FindFirstChild("Items"), safeFolder:FindFirstChild("Money"), false)
-                                    
+                                    interactWithVisibleMeshParts(safeFolder:FindFirstChild("Items"))
+                                    interactWithVisibleMeshParts(safeFolder:FindFirstChild("Money"))
+
                                     stopPoliceMonitoring()
                                     task.wait(0.5)
 
                                     ensurePlayerInVehicle()
-                                    tweenTo(SERVER_HOP_SAFE_POSITION)
+                                    tweenTo(JewelerHopPos)
                                     task.wait(1)
                                     performServerHop()
                                 else
@@ -2473,7 +2498,7 @@ end
                                         Title = "Jeweler Safe is not open",
                                         Text = "Going to server hop",
                                     })
-                                    tweenTo(SERVER_HOP_SAFE_POSITION)
+                                    tweenTo(JewelerHopPos)
                                     task.wait(1)
                                     performServerHop()
                                 end
@@ -2482,7 +2507,7 @@ end
                                     Title = "Mode: Club & Bank",
                                     Text = "Skipping Jeweler → Server Hop",
                                 })
-                                tweenTo(SERVER_HOP_SAFE_POSITION)
+                                tweenTo(JewelerHopPos)
                                 task.wait(1)
                                 performServerHop()
                             end
