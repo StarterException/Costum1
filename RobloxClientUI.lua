@@ -182,24 +182,33 @@ local OrionLib = {
 	SaveCfg = false
 }
 
---Feather Icons https://github.com/evoincorp/lucideblox/tree/master/src/modules/util - Created by 7kayoh
+-- Lucide (lucideblox) → rbxassetid — Quelle: https://github.com/frappedevs/lucideblox
 local Icons = {}
+local LUCIDE_FALLBACK = "rbxassetid://7734052925"
 
 local Success, Response = pcall(function()
-	Icons = HttpService:JSONDecode(game:HttpGetAsync("https://raw.githubusercontent.com/evoincorp/lucideblox/master/src/modules/util/icons.json")).icons
+	local url = "https://raw.githubusercontent.com/frappedevs/lucideblox/master/src/modules/util/icons.json"
+	local data = HttpService:JSONDecode(game:HttpGetAsync(url))
+	Icons = (data and data.icons) or data or {}
 end)
 
 if not Success then
-	warn("\nOrion Library - Failed to load Feather Icons. Error code: " .. Response .. "\n")
-end	
+	warn("[Costum UI] Lucide-Icons konnten nicht geladen werden: ", tostring(Response))
+end
 
 local function GetIcon(IconName)
 	if Icons[IconName] ~= nil then
 		return Icons[IconName]
-	else
-		return nil
 	end
-end   
+	return nil
+end
+
+local function Lucide(iconName)
+	if type(iconName) == "string" and Icons[iconName] ~= nil and Icons[iconName] ~= "" then
+		return Icons[iconName]
+	end
+	return LUCIDE_FALLBACK
+end
 
 local Orion = Instance.new("ScreenGui")
 Orion.Name = "Orion"
@@ -576,16 +585,17 @@ CreateElement("ScrollFrame", function(Color, Width)
 end)
 
 CreateElement("Image", function(ImageID)
-	local ImageNew = Create("ImageLabel", {
-		Image = ImageID,
+	local resolved = ImageID
+	if type(ImageID) == "string" then
+		local low = string.sub(ImageID, 1, 13)
+		if low ~= "rbxassetid://" and string.sub(ImageID, 1, 7) ~= "http://" and string.sub(ImageID, 1, 5) ~= "rbx://" then
+			resolved = Lucide(ImageID)
+		end
+	end
+	return Create("ImageLabel", {
+		Image = resolved,
 		BackgroundTransparency = 1
 	})
-
-	if GetIcon(ImageID) ~= nil then
-		ImageNew.Image = GetIcon(ImageID)
-	end	
-
-	return ImageNew
 end)
 
 CreateElement("ImageButton", function(ImageID)
@@ -628,7 +638,7 @@ function OrionLib:MakeNotification(NotificationConfig)
 	spawn(function()
 		NotificationConfig.Name = NotificationConfig.Name or "Notification"
 		NotificationConfig.Content = NotificationConfig.Content or "Test"
-		NotificationConfig.Image = NotificationConfig.Image or "rbxassetid://4384403532"
+		NotificationConfig.Image = NotificationConfig.Image or "bell"
 		NotificationConfig.Time = math.max(NotificationConfig.Time or 5, 1.2)
 
 		local Th = OrionLib.Themes[OrionLib.SelectedTheme]
@@ -877,6 +887,10 @@ end
 function OrionLib:MakeWindow(WindowConfig)
 	local FirstTab = true
 	local Minimized = false
+	local userWinW, userWinH = 680, 400
+	local resizing = false
+	local resizeStartMouse
+	local resizeStartSize
 	local Loaded = false
 	local UIHidden = false
 
@@ -927,8 +941,8 @@ function OrionLib:MakeWindow(WindowConfig)
 	WindowConfig.IntroText = WindowConfig.IntroText or "Orion Library"
 	WindowConfig.CloseCallback = WindowConfig.CloseCallback or function() end
 	WindowConfig.ShowIcon = WindowConfig.ShowIcon or false
-	WindowConfig.Icon = WindowConfig.Icon or "rbxassetid://8834748103"
-	WindowConfig.IntroIcon = WindowConfig.IntroIcon or "rbxassetid://8834748103"
+	WindowConfig.Icon = WindowConfig.Icon or "layout-dashboard"
+	WindowConfig.IntroIcon = WindowConfig.IntroIcon or "layout-dashboard"
 	WindowConfig.BrandName = WindowConfig.BrandName or "Lyphix"
 	WindowConfig.BrandTag = WindowConfig.BrandTag or ""
 	OrionLib.Folder = WindowConfig.ConfigFolder
@@ -991,7 +1005,7 @@ function OrionLib:MakeWindow(WindowConfig)
 		Position = UDim2.new(0.5, 0, 0, 0),
 		BackgroundTransparency = 1
 	}), {
-		AddThemeObject(SetProps(MakeElement("Image", "rbxassetid://7072725342"), {
+		AddThemeObject(SetProps(MakeElement("Image", "x"), {
 			Position = UDim2.new(0, 9, 0, 6),
 			Size = UDim2.new(0, 18, 0, 18),
 			Name = "Glyph"
@@ -1002,7 +1016,7 @@ function OrionLib:MakeWindow(WindowConfig)
 		Size = UDim2.new(0.5, 0, 1, 0),
 		BackgroundTransparency = 1
 	}), {
-		AddThemeObject(SetProps(MakeElement("Image", "rbxassetid://7072719338"), {
+		AddThemeObject(SetProps(MakeElement("Image", "minus"), {
 			Position = UDim2.new(0, 9, 0, 6),
 			Size = UDim2.new(0, 18, 0, 18),
 			Name = "Ico"
@@ -1058,7 +1072,7 @@ function OrionLib:MakeWindow(WindowConfig)
 					Name = "PremiumKeyOpener"
 				}), {
 					AddThemeObject(SetProps(MakeElement("Stroke"), {Transparency = 0.82, Thickness = 1.05}), "Stroke"),
-					AddThemeObject(SetProps(MakeElement("Image", "rbxassetid://3926305901"), {
+					AddThemeObject(SetProps(MakeElement("Image", "lock"), {
 						Size = UDim2.new(0, 14, 0, 14),
 						Position = UDim2.new(0, 10, 0.5, -7),
 						ImageTransparency = 0.2,
@@ -1120,7 +1134,7 @@ function OrionLib:MakeWindow(WindowConfig)
 		TextTruncate = Enum.TextTruncate.AtEnd
 	}), "Text")
 
-	local PremiumCrown = SetProps(MakeElement("Image", "rbxassetid://3944688395"), {
+	local PremiumCrown = SetProps(MakeElement("Image", "crown"), {
 		Size = UDim2.new(0, 22, 0, 22),
 		Position = UDim2.new(0, 26, 0, 16),
 		BackgroundTransparency = 1,
@@ -1151,7 +1165,7 @@ function OrionLib:MakeWindow(WindowConfig)
 			Thickness = 1.05,
 			LineJoinMode = Enum.LineJoinMode.Round
 		}), "Stroke"),
-		AddThemeObject(SetProps(MakeElement("Image", "rbxassetid://6031094677"), {
+		AddThemeObject(SetProps(MakeElement("Image", "palette"), {
 			Size = UDim2.new(0, 16, 0, 16),
 			Position = UDim2.new(0, 12, 0.5, -8),
 			ImageTransparency = 0.25,
@@ -1212,7 +1226,7 @@ function OrionLib:MakeWindow(WindowConfig)
 					Thickness = 1.05,
 					LineJoinMode = Enum.LineJoinMode.Round
 				}), "Stroke"),
-				AddThemeObject(SetProps(MakeElement("Image", "rbxassetid://6031094677"), {
+				AddThemeObject(SetProps(MakeElement("Image", "search"), {
 					Size = UDim2.new(0, 16, 0, 16),
 					Position = UDim2.new(0, 12, 0.5, -8),
 					ImageTransparency = 0.32,
@@ -1265,6 +1279,54 @@ function OrionLib:MakeWindow(WindowConfig)
 
 	MainWindow.BackgroundTransparency = 0.14
 	WindowStuff.BackgroundTransparency = 0.36
+
+	local ResizeGrip = AddThemeObject(SetProps(Create("ImageButton", {
+		Parent = MainWindow,
+		Name = "ResizeGrip",
+		Size = UDim2.new(0, 22, 0, 22),
+		Position = UDim2.new(1, -4, 1, -4),
+		AnchorPoint = Vector2.new(1, 1),
+		BackgroundTransparency = 1,
+		BorderSizePixel = 0,
+		Image = Lucide("grip-vertical"),
+		ScaleType = Enum.ScaleType.Fit,
+		ImageTransparency = 0.48,
+		Text = "",
+		AutoButtonColor = false,
+		ZIndex = 95,
+	}), {}), "TextDark")
+
+	AddConnection(ResizeGrip.InputBegan, function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+			if Minimized then
+				return
+			end
+			resizing = true
+			resizeStartMouse = input.Position
+			resizeStartSize = MainWindow.AbsoluteSize
+		end
+	end)
+	AddConnection(UserInputService.InputEnded, function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+			resizing = false
+		end
+	end)
+	AddConnection(UserInputService.InputChanged, function(input)
+		if not resizing then
+			return
+		end
+		if Minimized then
+			return
+		end
+		if input.UserInputType ~= Enum.UserInputType.MouseMovement and input.UserInputType ~= Enum.UserInputType.Touch then
+			return
+		end
+		local d = input.Position - resizeStartMouse
+		local w = math.clamp(math.floor(resizeStartSize.X + d.X + 0.5), 520, 1100)
+		local h = math.clamp(math.floor(resizeStartSize.Y + d.Y + 0.5), 340, 900)
+		MainWindow.Size = UDim2.fromOffset(w, h)
+		userWinW, userWinH = w, h
+	end)
 
 	local ThemeScroll = SetChildren(SetProps(MakeElement("ScrollFrame", Color3.fromRGB(255, 255, 255), 2), {
 		Name = "ThemeScroll",
@@ -1388,7 +1450,7 @@ function OrionLib:MakeWindow(WindowConfig)
 					TextTransparency = locked and 0.45 or 0.04,
 					TextColor3 = ThNow.Text
 				}),
-				SetProps(MakeElement("Image", "rbxassetid://3926305901"), {
+				SetProps(MakeElement("Image", "lock"), {
 					Size = UDim2.new(0, 16, 0, 16),
 					Position = UDim2.new(1, -28, 0.5, -8),
 					BackgroundTransparency = 1,
@@ -1605,7 +1667,7 @@ function OrionLib:MakeWindow(WindowConfig)
 			OrionLib:MakeNotification({
 				Name = "Premium",
 				Content = "Freigeschaltet – alle Premium-Themes und Tabs sind aktiv.",
-				Image = "rbxassetid://3944688395",
+				Image = "crown",
 				Time = 4
 			})
 		else
@@ -1742,16 +1804,18 @@ function OrionLib:MakeWindow(WindowConfig)
 
 	AddConnection(MinimizeBtn.MouseButton1Up, function()
 		if Minimized then
-			TweenService:Create(MainWindow, TweenInfo.new(0.5, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Size = UDim2.new(0, 680, 0, 400)}):Play()
-			MinimizeBtn.Ico.Image = "rbxassetid://7072719338"
+			TweenService:Create(MainWindow, TweenInfo.new(0.5, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Size = UDim2.fromOffset(userWinW, userWinH)}):Play()
+			MinimizeBtn.Ico.Image = Lucide("minus")
 			wait(.02)
 			MainWindow.ClipsDescendants = false
 			WindowStuff.Visible = true
 			WindowTopBarLine.Visible = true
 		else
+			userWinW = math.floor(MainWindow.AbsoluteSize.X + 0.5)
+			userWinH = math.floor(MainWindow.AbsoluteSize.Y + 0.5)
 			MainWindow.ClipsDescendants = true
 			WindowTopBarLine.Visible = false
-			MinimizeBtn.Ico.Image = "rbxassetid://7072720870"
+			MinimizeBtn.Ico.Image = Lucide("square")
 
 			TweenService:Create(MainWindow, TweenInfo.new(0.5, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Size = UDim2.new(0, WindowName.TextBounds.X + 176, 0, 54)}):Play()
 			wait(0.1)
@@ -2107,7 +2171,7 @@ function OrionLib:MakeWindow(WindowConfig)
 				ButtonConfig = ButtonConfig or {}
 				ButtonConfig.Name = ButtonConfig.Name or "Button"
 				ButtonConfig.Callback = ButtonConfig.Callback or function() end
-				ButtonConfig.Icon = ButtonConfig.Icon or "rbxassetid://3944703587"
+				ButtonConfig.Icon = ButtonConfig.Icon or "mouse-pointer-click"
 
 				local Button = {}
 
@@ -2500,7 +2564,7 @@ function OrionLib:MakeWindow(WindowConfig)
 							TextTransparency = 0.04,
 							Name = "Content"
 						}), "Text"),
-						AddThemeObject(SetProps(MakeElement("Image", "rbxassetid://7072706796"), {
+						AddThemeObject(SetProps(MakeElement("Image", "chevron-down"), {
 							Size = UDim2.new(0, 18, 0, 18),
 							AnchorPoint = Vector2.new(1, 0.5),
 							Position = UDim2.new(1, -16, 0.5, 0),
@@ -3331,7 +3395,7 @@ function OrionLib:MakeWindow(WindowConfig)
 					})
 				}),
 				AddThemeObject(SetProps(MakeElement("Stroke"), {Transparency = 0.55, Thickness = 1.1}), "Stroke"),
-				AddThemeObject(SetProps(MakeElement("Image", "rbxassetid://3926305901"), {
+				AddThemeObject(SetProps(MakeElement("Image", "lock"), {
 					Size = UDim2.new(0, 52, 0, 52),
 					Position = UDim2.new(0.5, 0, 0.36, 0),
 					AnchorPoint = Vector2.new(0.5, 0.5),
