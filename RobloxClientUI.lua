@@ -249,36 +249,60 @@ function OrionLib:IsRunning()
 	return ok and live == true
 end
 
--- Schließen/Minimize: Click + Up + Activated (Executors); gemeinsamer Gate gegen Doppelfire.
+-- Schließen/Minimize: Click + Up + optional Activated; Gate-Reset mit wait-Fallback (task.wait fehlt manchmal).
 local function BindWinChromeClick(guiButton, callback, debounceSec)
-	if not guiButton or not guiButton.MouseButton1Click then
+	if not guiButton or type(callback) ~= "function" then
+		return
+	end
+	local clickSig = guiButton.MouseButton1Click
+	if not clickSig or type(clickSig.Connect) ~= "function" then
 		return
 	end
 	debounceSec = debounceSec or 0.22
+	local spawnFn = (type(task) == "table" and type(task.spawn) == "function" and task.spawn) or (type(spawn) == "function" and spawn)
+	local waitFn = (type(task) == "table" and type(task.wait) == "function" and task.wait) or (type(wait) == "function" and wait)
 	local gate = false
 	local function runOnce()
 		if gate then
 			return
 		end
 		gate = true
-		task.spawn(function()
-			task.wait(debounceSec)
+		if spawnFn and waitFn then
+			spawnFn(function()
+				waitFn(debounceSec)
+				gate = false
+			end)
+		else
 			gate = false
-		end)
+		end
 		callback()
 	end
-	AddConnection(guiButton.MouseButton1Click, runOnce)
-	AddConnection(guiButton.MouseButton1Up, runOnce)
-	AddConnection(guiButton.Activated, runOnce)
+	AddConnection(clickSig, runOnce)
+	local upSig = guiButton.MouseButton1Up
+	if upSig and type(upSig.Connect) == "function" then
+		AddConnection(upSig, runOnce)
+	end
+	local actSig = guiButton.Activated
+	if actSig and type(actSig.Connect) == "function" then
+		AddConnection(actSig, runOnce)
+	end
 end
 
 local function AddConnection(Signal, Function)
-	if (not OrionLib:IsRunning()) then
+	if not OrionLib:IsRunning() then
 		return
 	end
-	local SignalConnect = Signal:Connect(Function)
-	table.insert(OrionLib.Connections, SignalConnect)
-	return SignalConnect
+	if not Signal or type(Function) ~= "function" or type(Signal.Connect) ~= "function" then
+		return
+	end
+	local ok, SignalConnect = pcall(function()
+		return Signal:Connect(Function)
+	end)
+	if ok and SignalConnect then
+		table.insert(OrionLib.Connections, SignalConnect)
+		return SignalConnect
+	end
+	return nil
 end
 
 task.spawn(function()
