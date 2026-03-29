@@ -823,7 +823,7 @@ task.spawn(function()
                         local plrTweenSpeed = 50
                         local policeAbort = 25
                         local bombDetectionEnabled = true
-                        local PlayerTeleportEnabled = true
+                        local PlayerTeleportEnabled = false
                         local invisibleEnabled = false
 
 
@@ -1234,7 +1234,7 @@ task.spawn(function()
                         local fireBombRemoteEvent = game:GetService("ReplicatedStorage"):WaitForChild("EJw"):WaitForChild("66291b15-ebda-4dbd-964e-cc89f86d2c82")
                         local robRemoteEvent = game:GetService("ReplicatedStorage"):WaitForChild("EJw"):WaitForChild("a3126821-130a-4135-80e1-1d28cece4007")
                         local sellRemoteEvent = game:GetService("ReplicatedStorage"):WaitForChild("EJw"):WaitForChild("eb233e6a-acb9-4169-acb9-129fe8cb06bb")
-                        local ProximityPromptTimeBet = 1.38
+                        local ProximityPromptTimeBet = 2.5
                         local VirtualInputManager = game:GetService("VirtualInputManager")
                         local key = Enum.KeyCode.E
                         local TweenService = game:GetService("TweenService")
@@ -1636,8 +1636,10 @@ end
                             end
 
                             local distance = (char.PrimaryPart.Position - destination).Magnitude
+                            -- Nur Mini-Sprünge snappen — größere Distanz = echter Tween (wichtig fürs Loot)
+                            local instantTpMaxStuds = 14
 
-                            if PlayerTeleportEnabled and distance < 300 then
+                            if PlayerTeleportEnabled and distance < instantTpMaxStuds then
                                 if currentPlrTween then
                                     pcall(function()
                                         currentPlrTween:Cancel()
@@ -1813,7 +1815,7 @@ end
 
                         -- Unterordner (verschachtelte Parts) + kurze Nachläufe; schmal nur unter diesem folder
                         local LOOT_SWEEP_MAX = 5
-                        local LOOT_SWEEP_GAP = 0.05
+                        local LOOT_SWEEP_GAP = 0.1
 
                         local function isLootableBasePart(ch)
                             return ch:IsA("BasePart") and ch.Transparency < 0.97
@@ -1956,8 +1958,42 @@ end
                                         robRemoteEvent:FireServer(unpack(args4))
                                         recordLootStat(false)
                                     end
-                                    task.wait(0.04)
+                                    task.wait(0.085)
                                 end
+                            end
+                        end
+
+                        local function countRemainingLootInFolder(folder)
+                            if not folder or isAborting then
+                                return 0
+                            end
+                            local n = 0
+                            for _, ch in ipairs(folder:GetDescendants()) do
+                                if isLootableBasePart(ch) and ch.Transparency < 0.97 then
+                                    n = n + 1
+                                end
+                            end
+                            return n
+                        end
+
+                        local function lootSafeUntilClear(itemsFolder, moneyFolder, usePlrTweenPath)
+                            local maxRounds = 12
+                            for _ = 1, maxRounds do
+                                if isAborting then
+                                    return
+                                end
+                                if usePlrTweenPath then
+                                    interactWithVisibleMeshParts2(itemsFolder)
+                                    interactWithVisibleMeshParts2(moneyFolder)
+                                else
+                                    interactWithVisibleMeshParts(itemsFolder)
+                                    interactWithVisibleMeshParts(moneyFolder)
+                                end
+                                local left = countRemainingLootInFolder(itemsFolder) + countRemainingLootInFolder(moneyFolder)
+                                if left == 0 then
+                                    return
+                                end
+                                task.wait(0.18)
                             end
                         end
 
@@ -1970,7 +2006,7 @@ end
                             local HumanoidRootPart = Character:WaitForChild("HumanoidRootPart")
 
                             local Collected = {}
-                            local ProximityPromptTimeBet = 1.38
+                            local ProximityPromptTimeBet = 2.28
                             local Range = 30
                             local Robberies = {}
 
@@ -2084,21 +2120,34 @@ end
                             lyphixDealerApproachActive = false
                         end
 
-                        local function buyBombFromDealerIfNeeded()
-                            if playerHasBombInInventory() then
-                                return
+                        -- Einmal zum Dealer: Gold verkaufen (wenn Auto-Sell an) + Bombe kaufen (wenn fehlt)
+                        local function visitDealerFulfillNeeds()
+                            local needSell = autoSellToggle
+                            local needBomb = not playerHasBombInInventory()
+                            if not needSell and not needBomb then
+                                return false
                             end
                             ensurePlayerInVehicle()
                             MoveToDealer()
                             task.wait(0.03)
-                            local argsBuy = { [1] = "Bomb", [2] = "Dealer" }
-                            buyRemoteEvent:FireServer(unpack(argsBuy))
-                            recordBombPurchase()
-                            local deadline = os.clock() + 2.2
-                            while not playerHasBombInInventory() and os.clock() < deadline do
-                                task.wait(0.03)
+                            if needSell then
+                                local argsSell = { [1] = "Gold", [2] = "Dealer" }
+                                sellRemoteEvent:FireServer(unpack(argsSell))
+                                sellRemoteEvent:FireServer(unpack(argsSell))
+                                sellRemoteEvent:FireServer(unpack(argsSell))
+                                task.wait(0.04)
+                            end
+                            if needBomb then
+                                local argsBuy = { [1] = "Bomb", [2] = "Dealer" }
+                                buyRemoteEvent:FireServer(unpack(argsBuy))
+                                recordBombPurchase()
+                                local deadline = os.clock() + 2.2
+                                while not playerHasBombInInventory() and os.clock() < deadline do
+                                    task.wait(0.03)
+                                end
                             end
                             task.wait(0.02)
+                            return true
                         end
 
                         local function robBankAndClub()
@@ -2136,15 +2185,8 @@ end
                             local bankLight = workspace.Robberies.BankRobbery.LightGreen.Light
                             local bankLight2 = workspace.Robberies.BankRobbery.LightRed.Light
 
-                            if autoSellToggle == true then
+                            if visitDealerFulfillNeeds() then
                                 ensurePlayerInVehicle()
-                                MoveToDealer()
-                                task.wait(0.03)
-                                local args = { [1] = "Gold", [2] = "Dealer" }
-                                sellRemoteEvent:FireServer(unpack(args))
-                                sellRemoteEvent:FireServer(unpack(args))
-                                sellRemoteEvent:FireServer(unpack(args))
-                                task.wait(0.04)
                                 tweenTo(Vector3.new(-1370.972412109375, 5.499999046325684, 3127.154541015625))
                             end
 
@@ -2158,7 +2200,10 @@ end
                                     Text = "Going to rob",
                                 })
 
-                                buyBombFromDealerIfNeeded()
+                                if visitDealerFulfillNeeds() then
+                                    ensurePlayerInVehicle()
+                                    tweenTo(Vector3.new(-1370.972412109375, 5.499999046325684, 3127.154541015625))
+                                end
 
                                 ensurePlayerInVehicle()
                                 tweenTo(clubPos)
@@ -2172,14 +2217,13 @@ end
                                 runBombThrowSequence()
 
                                 plrTween(clubSafe)
-                                task.wait(1.2)
+                                task.wait(1.65)
                                 plrTween(clubStand)
 
                                 startPoliceMonitoring("Club")
 
                                 local safeFolder = workspace.Robberies["Club Robbery"].Club
-                                interactWithVisibleMeshParts(safeFolder:FindFirstChild("Items"))
-                                interactWithVisibleMeshParts(safeFolder:FindFirstChild("Money"))
+                                lootSafeUntilClear(safeFolder:FindFirstChild("Items"), safeFolder:FindFirstChild("Money"), false)
                                 task.wait(0.22)
 
                                 stopPoliceMonitoring()
@@ -2201,7 +2245,10 @@ end
                                     Text = "Going to rob",
                                 })
 
-                                buyBombFromDealerIfNeeded()
+                                if visitDealerFulfillNeeds() then
+                                    ensurePlayerInVehicle()
+                                    tweenTo(Vector3.new(-1370.972412109375, 5.499999046325684, 3127.154541015625))
+                                end
 
                                 tweenTo(Vector3.new(-1202.86181640625, 7.877995491027832, 3164.614501953125))
                                 JumpOut()
@@ -2248,7 +2295,10 @@ end
                                         Text = "Going to rob",
                                     })
 
-                                    buyBombFromDealerIfNeeded()
+                                    if visitDealerFulfillNeeds() then
+                                        ensurePlayerInVehicle()
+                                        tweenTo(Vector3.new(-1370.972412109375, 5.499999046325684, 3127.154541015625))
+                                    end
 
                                     ensurePlayerInVehicle()
                                     tweenTo(JewelerPos)
@@ -2262,14 +2312,13 @@ end
                                     runBombThrowSequence()
 
                                     plrTween(JewelerSafe)
-                                    task.wait(1.2)
+                                    task.wait(1.65)
                                     plrTween(JewelerStand)
 
                                     startPoliceMonitoring("Jeweler")
 
                                     local safeFolder = workspace.Robberies["Jeweler Safe Robbery"].Jeweler
-                                    interactWithVisibleMeshParts(safeFolder:FindFirstChild("Items"))
-                                    interactWithVisibleMeshParts(safeFolder:FindFirstChild("Money"))
+                                    lootSafeUntilClear(safeFolder:FindFirstChild("Items"), safeFolder:FindFirstChild("Money"), false)
                                     
                                     stopPoliceMonitoring()
                                     task.wait(0.22)
@@ -2352,7 +2401,10 @@ end
                             if con1Planks.Transparency == 1 then
                                 ensurePlayerInVehicle()
                                 task.wait(0.2)
-                                buyBombFromDealerIfNeeded()
+                                if visitDealerFulfillNeeds() then
+                                    ensurePlayerInVehicle()
+                                    tweenTo(Vector3.new(1058.7470703125, 5.733738899230957, 2218.6943359375))
+                                end
                                 tweenTo(con1Planks.Position)
                                 task.wait(0.22)
                                 JumpOut()
@@ -2370,10 +2422,7 @@ end
                                 
                                 startPoliceMonitoring("Container 1")
                                 
-                                interactWithVisibleMeshParts2(container1:FindFirstChild("Items"))
-                                interactWithVisibleMeshParts2(container1:FindFirstChild("Items"))
-                                interactWithVisibleMeshParts2(container1:FindFirstChild("Money"))
-                                interactWithVisibleMeshParts2(container1:FindFirstChild("Money"))
+                                lootSafeUntilClear(container1:FindFirstChild("Items"), container1:FindFirstChild("Money"), true)
                                 
                                 stopPoliceMonitoring()
                                 task.wait(0.06)
@@ -2390,7 +2439,10 @@ end
                             if con2Planks.Transparency == 1 then
                                 ensurePlayerInVehicle()
                                 task.wait(0.2)
-                                buyBombFromDealerIfNeeded()
+                                if visitDealerFulfillNeeds() then
+                                    ensurePlayerInVehicle()
+                                    tweenTo(Vector3.new(1058.7470703125, 5.733738899230957, 2218.6943359375))
+                                end
                                 tweenTo(con2Planks.Position)
                                 task.wait(0.22)
                                 JumpOut()
@@ -2408,10 +2460,7 @@ end
                                 
                                 startPoliceMonitoring("Container 2")
                                 
-                                interactWithVisibleMeshParts2(container2:FindFirstChild("Items"))
-                                interactWithVisibleMeshParts2(container2:FindFirstChild("Items"))
-                                interactWithVisibleMeshParts2(container2:FindFirstChild("Money"))
-                                interactWithVisibleMeshParts2(container2:FindFirstChild("Money"))
+                                lootSafeUntilClear(container2:FindFirstChild("Items"), container2:FindFirstChild("Money"), true)
                                 
                                 stopPoliceMonitoring()
                                 task.wait(0.22)
