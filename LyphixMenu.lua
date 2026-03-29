@@ -2364,6 +2364,17 @@ end
                             local JewelerPos = Vector3.new(-426.5001220703125, 21.522781372070312, 3576.979248046875)
                             local JewelerStand = Vector3.new(-439.0592041015625, 21.223413467407227, 3553.52783203125)
                             local JewelerSafe = Vector3.new(-407.1869201660156, 21.223413467407227, 3551.096435546875)
+                            -- Wurf-Spot auf der Linie Fahrzeug→Tresor (sonst endet plrTween mit Blick weg vom Safe → Bombe fliegt falsch)
+                            local JewelerThrowPrep
+                            do
+                                local flatA = Vector3.new(JewelerPos.X, 0, JewelerPos.Z)
+                                local flatS = Vector3.new(JewelerSafe.X, 0, JewelerSafe.Z)
+                                local seg = flatS - flatA
+                                local mag = seg.Magnitude
+                                local u = mag > 1 and seg.Unit or Vector3.new(0, 0, -1)
+                                local flatP = flatS - u * 12
+                                JewelerThrowPrep = Vector3.new(flatP.X, JewelerSafe.Y, flatP.Z)
+                            end
 
                             if robMode == "Rob Club, Jeweler & Bank" then
                                 if JewelerPart.Rotation == Vector3.new(0, -90, 0) then
@@ -2378,8 +2389,15 @@ end
                                     JumpOut()
                                     task.wait(0.5)
 
-                                    plrTween(Vector3.new(-437.28814697265625, 21.223413467407227, 3553.262939453125))
-                                    task.wait(0.5)
+                                    plrTween(JewelerThrowPrep)
+                                    task.wait(0.42)
+                                    local jChar = player.Character
+                                    local jHrp = jChar and jChar:FindFirstChild("HumanoidRootPart")
+                                    if jHrp then
+                                        local jp = jHrp.Position
+                                        jHrp.CFrame = CFrame.lookAt(jp, Vector3.new(JewelerSafe.X, jp.Y, JewelerSafe.Z))
+                                    end
+                                    task.wait(0.14)
 
                                     runBombThrowSequence()
 
