@@ -243,17 +243,30 @@ function OrionLib:IsRunning()
 	end
 	local CoreGui = game:GetService("CoreGui")
 	if gethui then
-		local h = gethui()
-		if h and (p == h or p:IsDescendantOf(h)) then
-			return true
+		local ok, h = pcall(gethui)
+		if ok and h and typeof(h) == "Instance" then
+			local ok2, under = pcall(function()
+				return p == h or p:IsDescendantOf(h)
+			end)
+			if ok2 and under then
+				return true
+			end
 		end
 	end
-	return p == CoreGui or p:IsDescendantOf(CoreGui)
+	if p == CoreGui then
+		return true
+	end
+	local ok3, inCoreGuiTree = pcall(function()
+		return p:IsDescendantOf(CoreGui)
+	end)
+	return ok3 and inCoreGuiTree
 end
 
--- Xeno / ältere Umgebungen: Activated feuert oft nicht; mehrere Events + Debounce = ein Auslösen.
+-- Schließen/Minimize: Kein Activated/InputBegan/MouseButton1Down — die können beim GUI-Aufbau
+-- oder unter Executors phantom auslösen und sofort performClose ausführen (leeres UI).
+-- Debounce zwischen Click und Up verhindert Doppelfire; Xeno nutzt oft zuverlässig MouseButton1Up.
 local function BindWinChromeClick(guiButton, callback, debounceSec)
-	debounceSec = debounceSec or 0.24
+	debounceSec = debounceSec or 0.22
 	local gate = false
 	local function runOnce()
 		if gate then
@@ -265,18 +278,8 @@ local function BindWinChromeClick(guiButton, callback, debounceSec)
 		end)
 		callback()
 	end
-	AddConnection(guiButton.Activated, runOnce)
 	AddConnection(guiButton.MouseButton1Click, runOnce)
-	AddConnection(guiButton.MouseButton1Down, runOnce)
-	AddConnection(guiButton.InputBegan, function(_input, gameProcessed)
-		if gameProcessed then
-			return
-		end
-		local t = _input.UserInputType
-		if t == Enum.UserInputType.MouseButton1 or t == Enum.UserInputType.Touch then
-			runOnce()
-		end
-	end)
+	AddConnection(guiButton.MouseButton1Up, runOnce)
 end
 
 local function AddConnection(Signal, Function)
@@ -1676,8 +1679,6 @@ function OrionLib:MakeWindow(WindowConfig)
 		WindowConfig.CloseCallback()
 	end
 
-	BindWinChromeClick(CloseBtn, performClose)
-
 	AddConnection(UserInputService.InputBegan, function(Input)
 		if Input.KeyCode == Enum.KeyCode.RightShift and UIHidden then
 			MainWindow.Visible = true
@@ -1716,7 +1717,11 @@ function OrionLib:MakeWindow(WindowConfig)
 		end)
 	end
 
-	BindWinChromeClick(MinimizeBtn, performMinimize)
+	task.defer(function()
+		task.wait(0.2)
+		BindWinChromeClick(CloseBtn, performClose)
+		BindWinChromeClick(MinimizeBtn, performMinimize)
+	end)
 
 	local function LoadSequence()
 		MainWindow.Visible = false
