@@ -1511,6 +1511,80 @@ task.spawn(function()
                             end
                         end
 
+                        -- Bombe im Inventar (Backpack/Charakter, auch verschachtelt)
+                        local function playerHasBombInInventory(who)
+                            who = who or plr
+                            if not who then
+                                return false
+                            end
+                            local function containerHasBomb(container)
+                                if not container then
+                                    return false
+                                end
+                                for _, d in ipairs(container:GetDescendants()) do
+                                    if d:IsA("Tool") and d.Name == "Bomb" then
+                                        return true
+                                    end
+                                end
+                                return false
+                            end
+                            return containerHasBomb(who.Backpack) or containerHasBomb(who.Character)
+                        end
+
+                        local function equipBombToolFromInventory()
+                            local char = plr.Character
+                            if not char then
+                                return false
+                            end
+                            local hum = char:FindFirstChildWhichIsA("Humanoid")
+                            if not hum then
+                                return false
+                            end
+                            if char:FindFirstChild("Bomb") and char:FindFirstChild("Bomb"):IsA("Tool") then
+                                return true
+                            end
+                            local bombTool = nil
+                            for _, d in ipairs(plr.Backpack:GetDescendants()) do
+                                if d:IsA("Tool") and d.Name == "Bomb" then
+                                    bombTool = d
+                                    break
+                                end
+                            end
+                            if not bombTool then
+                                return false
+                            end
+                            if bombTool.Parent ~= plr.Backpack then
+                                bombTool.Parent = plr.Backpack
+                                task.wait(0.06)
+                            end
+                            pcall(function()
+                                hum:EquipTool(bombTool)
+                            end)
+                            task.wait(0.12)
+                            return char:FindFirstChild("Bomb") ~= nil
+                        end
+
+                        local function runBombThrowSequence()
+                            EquipRemoteEvent:FireServer("Bomb")
+                            task.wait(0.45)
+                            if not (plr.Character and plr.Character:FindFirstChild("Bomb")) then
+                                equipBombToolFromInventory()
+                                task.wait(0.18)
+                            end
+                            if not (plr.Character and plr.Character:FindFirstChild("Bomb")) then
+                                equipBombToolFromInventory()
+                                task.wait(0.22)
+                            end
+                            local tool = plr.Character and plr.Character:FindFirstChild("Bomb")
+                            if tool then
+                                SpawnBomb()
+                            else
+                                warn("[Bomb] Tool 'Bomb' not on character after equip — check inventory.")
+                            end
+                            task.wait(0.5)
+                            fireBombRemoteEvent:FireServer()
+                        end
+
                         local function JumpOut()
                             local Players = game:GetService("Players")
                             local LocalPlayer = Players.LocalPlayer    
@@ -2084,6 +2158,23 @@ end
                             tweenTo(destination1)
                         end
 
+                        local function buyBombFromDealerIfNeeded()
+                            if playerHasBombInInventory() then
+                                return
+                            end
+                            ensurePlayerInVehicle()
+                            MoveToDealer()
+                            task.wait(0.5)
+                            local argsBuy = { [1] = "Bomb", [2] = "Dealer" }
+                            buyRemoteEvent:FireServer(unpack(argsBuy))
+                            recordBombPurchase()
+                            local deadline = os.clock() + 10
+                            while not playerHasBombInInventory() and os.clock() < deadline do
+                                task.wait(0.12)
+                            end
+                            task.wait(0.2)
+                        end
+
                         local function robBankAndClub()
                             if isServerHopping then
                                 return
@@ -2140,16 +2231,7 @@ end
                                     Text = "Going to rob",
                                 })
 
-                                local hasBomb = plr.Character:FindFirstChild("Bomb") or plr.Backpack:FindFirstChild("Bomb")
-                                if not hasBomb then
-                                    ensurePlayerInVehicle()
-                                    MoveToDealer()
-                                    task.wait(0.5)
-                                    local args = {[1] = "Bomb", [2] = "Dealer"}
-                                    buyRemoteEvent:FireServer(unpack(args))
-                                    recordBombPurchase()
-                                    task.wait(0.5)
-                                end
+                                buyBombFromDealerIfNeeded()
 
                                 ensurePlayerInVehicle()
                                 tweenTo(clubPos)
@@ -2160,19 +2242,7 @@ end
                                 plrTween(Vector3.new(-1744.177001953125, 11.125, 3017.20263671875))
                                 task.wait(0.5)
 
-                                local args = {[1] = "Bomb"}
-                                EquipRemoteEvent:FireServer(unpack(args))
-                                task.wait(0.5)
-
-                                local tool = plr.Character:FindFirstChild("Bomb")
-                                if tool then
-                                    SpawnBomb()
-                                else
-                                    warn("Tool 'Bomb' not found in the backpack!")
-                                end
-
-                                task.wait(0.5)
-                                fireBombRemoteEvent:FireServer()
+                                runBombThrowSequence()
 
                                 plrTween(clubSafe)
                                 task.wait(2.7)
@@ -2204,31 +2274,7 @@ end
                                     Text = "Going to rob",
                                 })
 
-                                ensurePlayerInVehicle()
-                                local hasBomb1 = false
-
-                                local function checkContainer(container)
-                                    for _, item in ipairs(container:GetChildren()) do
-                                        if item:IsA("Tool") and item.Name == "Bomb" then
-                                            return true
-                                        end
-                                    end
-                                    return false
-                                end
-
-                                hasBomb1 = checkContainer(plr.Backpack) or checkContainer(plr.Character)
-                                if not hasBomb1 then
-                                    ensurePlayerInVehicle()
-                                    task.wait(0.5)
-                                    MoveToDealer()
-                                    task.wait(0.5)
-                                    MoveToDealer()
-                                    task.wait(0.5)
-                                    local args = { [1] = "Bomb", [2] = "Dealer" }
-                                    buyRemoteEvent:FireServer(unpack(args))
-                                    recordBombPurchase()
-                                    task.wait(0.5)
-                                end
+                                buyBombFromDealerIfNeeded()
 
                                 tweenTo(Vector3.new(-1202.86181640625, 7.877995491027832, 3164.614501953125))
                                 tweenTo(Vector3.new(-1202.86181640625, 7.877995491027832, 3164.614501953125))
@@ -2236,19 +2282,7 @@ end
                                 task.wait(.5)
                                 plrTween(Vector3.new(-1242.367919921875, 7.749999046325684, 3144.705322265625))
                                 task.wait(.5)
-                                local args = { [1] = "Bomb" }
-                                EquipRemoteEvent:FireServer(unpack(args))
-                                task.wait(.5)
-
-                                local tool = plr.Character:FindFirstChild("Bomb")
-                                if tool then
-                                    SpawnBomb()
-                                else
-                                    warn("Tool 'Bomb' not found in the backpack!")
-                                end
-
-                                task.wait(0.5)
-                                fireBombRemoteEvent:FireServer()
+                                runBombThrowSequence()
                                 plrTween(Vector3.new(-1239.36669921875, 7.7235002517700195, 3114.240966796875))
                                 
                                 startPoliceMonitoring("Bank")
@@ -2288,16 +2322,7 @@ end
                                         Text = "Going to rob",
                                     })
 
-                                    local hasBomb = plr.Character:FindFirstChild("Bomb") or plr.Backpack:FindFirstChild("Bomb")
-                                    if not hasBomb then
-                                        ensurePlayerInVehicle()
-                                        MoveToDealer()
-                                        task.wait(0.5)
-                                        local args = {[1] = "Bomb", [2] = "Dealer"}
-                                        buyRemoteEvent:FireServer(unpack(args))
-                                        recordBombPurchase()
-                                        task.wait(0.5)
-                                    end
+                                    buyBombFromDealerIfNeeded()
 
                                     ensurePlayerInVehicle()
                                     tweenTo(JewelerPos)
@@ -2308,19 +2333,7 @@ end
                                     plrTween(Vector3.new(-437.28814697265625, 21.223413467407227, 3553.262939453125))
                                     task.wait(0.5)
 
-                                    local args = {[1] = "Bomb"}
-                                    EquipRemoteEvent:FireServer(unpack(args))
-                                    task.wait(0.5)
-
-                                    local tool = plr.Character:FindFirstChild("Bomb")
-                                    if tool then
-                                        SpawnBomb()
-                                    else
-                                        warn("Tool 'Bomb' not found in the backpack!")
-                                    end
-
-                                    task.wait(0.5)
-                                    fireBombRemoteEvent:FireServer()
+                                    runBombThrowSequence()
 
                                     plrTween(JewelerSafe)
                                     task.wait(2.7)
@@ -2413,12 +2426,7 @@ end
                             if con1Planks.Transparency == 1 then
                                 ensurePlayerInVehicle()
                                 task.wait(.5)
-                                MoveToDealer()
-                                task.wait(.5)
-                                local args = { [1] = "Bomb", [2] = "Dealer" }
-                                buyRemoteEvent:FireServer(unpack(args))
-                                recordBombPurchase()
-                                task.wait(0.5)
+                                buyBombFromDealerIfNeeded()
                                 tweenTo(con1Planks.Position)
                                 tweenTo(con1Planks.Position)
                                 task.wait(0.5)
@@ -2426,19 +2434,7 @@ end
                                 task.wait(0.5)
                                 plrTween(con1Planks.Position)
                                 task.wait(0.5)
-                                args = { [1] = "Bomb" }
-                                EquipRemoteEvent:FireServer(unpack(args))
-                                task.wait(0.5)
-
-                                local tool = plr.Character:FindFirstChild("Bomb")
-                                if tool then
-                                    SpawnBomb()
-                                else
-                                    warn("Tool 'Bomb' not found in the backpack!")
-                                end
-
-                                task.wait(.5)
-                                fireBombRemoteEvent:FireServer()
+                                runBombThrowSequence()
                                 ensurePlayerInVehicle()
                                 tweenTo(Vector3.new(1096.401, 57.31, 2226.765))
                                 task.wait(2)
@@ -2469,31 +2465,14 @@ end
                             if con2Planks.Transparency == 1 then
                                 ensurePlayerInVehicle()
                                 task.wait(.5)
-                                MoveToDealer()
-                                task.wait(.5)
-                                local args = { [1] = "Bomb", [2] = "Dealer" }
-                                buyRemoteEvent:FireServer(unpack(args))
-                                recordBombPurchase()
-                                task.wait(0.5)
+                                buyBombFromDealerIfNeeded()
                                 tweenTo(con2Planks.Position)
                                 task.wait(0.5)
                                 JumpOut()
                                 task.wait(.5)
                                 plrTween(con2Planks.Position)
                                 task.wait(0.5)
-                                args = { [1] = "Bomb" }
-                                EquipRemoteEvent:FireServer(unpack(args))
-                                task.wait(0.5)
-
-                                local tool = plr.Character:FindFirstChild("Bomb")
-                                if tool then
-                                    SpawnBomb()
-                                else
-                                    warn("Tool 'Bomb' not found in the backpack!")
-                                end
-
-                                task.wait(0.5)
-                                fireBombRemoteEvent:FireServer()
+                                runBombThrowSequence()
                                 ensurePlayerInVehicle()
                                 tweenTo(Vector3.new(1096.401, 57.31, 2226.765))
                                 task.wait(2)
