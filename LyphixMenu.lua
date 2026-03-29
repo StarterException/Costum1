@@ -60,8 +60,6 @@ local sessionMeta = {
 }
 
 local CoreGui = game:GetService("CoreGui")
-local RunService = game:GetService("RunService")
-local Players = game:GetService("Players")
 
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "MoonHubWatermark"
@@ -188,7 +186,7 @@ local lastTime = tick()
 local frameCount = 0
 
 RunService.RenderStepped:Connect(function()
-    frameCount += 1
+    frameCount = frameCount + 1
     local now = tick()
     local delta = now - lastTime
 
@@ -852,6 +850,7 @@ task.spawn(function()
                         
                         if not success or not OrionLib then
                             warn("[ERROR] Failed to load Orion Library: " .. tostring(err))
+                            prisonCheckStarted = false
                             return
                         end
 
@@ -1743,27 +1742,7 @@ end
                             end)
                         end
 
-                        local function meshPartStillLootable(m)
-                            return m and m.Parent and m:IsA("MeshPart") and m.Transparency < 0.98
-                        end
-
-                        local function gatherLootMeshPartsUnder(folder)
-                            local list = {}
-                            if not folder then
-                                return list
-                            end
-                            for _, ch in ipairs(folder:GetDescendants()) do
-                                if ch:IsA("MeshPart") and ch.Transparency < 0.98 then
-                                    table.insert(list, ch)
-                                end
-                            end
-                            return list
-                        end
-
-                        -- Schnell wie früher: erster Durchgang ohne Extra-Wartezeit; nur wenn noch Rest-Parts da sind, kurze Nachläufe
-                        local LOOT_RETRY_MAX = 8
-                        local LOOT_RETRY_GAP = 0.065
-
+                        -- Wie Original (message.txt): direkte Kinder, Transparency == 0, ein schneller Pass
                         local function interactWithVisibleMeshParts(folder)
                             if not folder or isAborting then
                                 return
@@ -1775,58 +1754,56 @@ end
                                 return
                             end
 
-                            for pass = 1, LOOT_RETRY_MAX do
+                            local meshParts = {}
+                            for _, meshPart in ipairs(folder:GetChildren()) do
+                                if meshPart:IsA("MeshPart") and meshPart.Transparency == 0 then
+                                    table.insert(meshParts, meshPart)
+                                end
+                            end
+
+                            table.sort(meshParts, function(a, b)
+                                local aDist = (a.Position - hrp.Position).Magnitude
+                                local bDist = (b.Position - hrp.Position).Magnitude
+                                return aDist < bDist
+                            end)
+
+                            for _, meshPart in ipairs(meshParts) do
                                 if isAborting then
                                     return
                                 end
-                                if pass > 1 then
-                                    task.wait(LOOT_RETRY_GAP)
+                                if checkForBomb() then
+                                    game.StarterGui:SetCore("SendNotification", {
+                                        Title = "Bomb Detection",
+                                        Text = "Aborting, detected bomb nearby",
+                                        Duration = 3,
+                                    })
+                                    return
                                 end
-                                local meshParts = gatherLootMeshPartsUnder(folder)
-                                if #meshParts == 0 then
-                                    break
+                                local hum = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
+                                if hum and hum.Health <= abortHealth then
+                                    game.StarterGui:SetCore("SendNotification", {
+                                        Title = "Player is hurt",
+                                        Text = "Aborting, player is hurt",
+                                    })
+                                    return
                                 end
-                                table.sort(meshParts, function(a, b)
-                                    return (a.Position - hrp.Position).Magnitude < (b.Position - hrp.Position).Magnitude
-                                end)
-
-                                for _, meshPart in ipairs(meshParts) do
-                                    if isAborting then
-                                        return
-                                    end
-                                    if checkForBomb() then
-                                        game.StarterGui:SetCore("SendNotification", {
-                                            Title = "Bomb Detection",
-                                            Text = "Aborting, detected bomb nearby",
-                                            Duration = 3,
-                                        })
-                                        return
-                                    end
-                                    if player.Character.Humanoid.Health <= abortHealth then
-                                        game.StarterGui:SetCore("SendNotification", {
-                                            Title = "Player is hurt",
-                                            Text = "Aborting, player is hurt",
-                                        })
-                                        return
-                                    end
-                                    if not meshPartStillLootable(meshPart) then
-                                        continue
-                                    end
-                                    if meshPart.Parent and meshPart.Parent.Name == "Money" then
-                                        local args = { meshPart, "yQL", true }
-                                        robRemoteEvent:FireServer(unpack(args))
-                                        task.wait(ProximityPromptTimeBet)
-                                        args[3] = false
-                                        robRemoteEvent:FireServer(unpack(args))
-                                        recordLootStat(true)
-                                    else
-                                        local args = { meshPart, "Vqe", true }
-                                        robRemoteEvent:FireServer(unpack(args))
-                                        task.wait(ProximityPromptTimeBet)
-                                        args[3] = false
-                                        robRemoteEvent:FireServer(unpack(args))
-                                        recordLootStat(false)
-                                    end
+                                if meshPart.Transparency == 1 then
+                                    continue
+                                end
+                                if meshPart.Parent and meshPart.Parent.Name == "Money" then
+                                    local args = { meshPart, "yQL", true }
+                                    robRemoteEvent:FireServer(unpack(args))
+                                    task.wait(ProximityPromptTimeBet)
+                                    args[3] = false
+                                    robRemoteEvent:FireServer(unpack(args))
+                                    recordLootStat(true)
+                                else
+                                    local args = { meshPart, "Vqe", true }
+                                    robRemoteEvent:FireServer(unpack(args))
+                                    task.wait(ProximityPromptTimeBet)
+                                    args[3] = false
+                                    robRemoteEvent:FireServer(unpack(args))
+                                    recordLootStat(false)
                                 end
                             end
                         end
@@ -1842,66 +1819,63 @@ end
                                 return
                             end
 
-                            for pass = 1, LOOT_RETRY_MAX do
+                            local meshParts = {}
+                            for _, meshPart in ipairs(folder:GetChildren()) do
+                                if meshPart:IsA("MeshPart") and meshPart.Transparency == 0 then
+                                    table.insert(meshParts, meshPart)
+                                end
+                            end
+
+                            table.sort(meshParts, function(a, b)
+                                local aDist = (a.Position - hrp.Position).Magnitude
+                                local bDist = (b.Position - hrp.Position).Magnitude
+                                return aDist < bDist
+                            end)
+
+                            for _, meshPart in ipairs(meshParts) do
                                 if isAborting then
                                     return
                                 end
-                                if pass > 1 then
-                                    task.wait(LOOT_RETRY_GAP)
+                                if checkForBomb() then
+                                    game.StarterGui:SetCore("SendNotification", {
+                                        Title = "Bomb Detection",
+                                        Text = "Aborting, detected bomb nearby",
+                                        Duration = 3,
+                                    })
+                                    return
                                 end
-                                local meshParts = gatherLootMeshPartsUnder(folder)
-                                if #meshParts == 0 then
-                                    break
+                                local hum2 = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
+                                if hum2 and hum2.Health <= abortHealth then
+                                    game.StarterGui:SetCore("SendNotification", {
+                                        Title = "Player is hurt",
+                                        Text = "Aborted, player is hurt",
+                                    })
+                                    return
                                 end
-                                table.sort(meshParts, function(a, b)
-                                    return (a.Position - hrp.Position).Magnitude < (b.Position - hrp.Position).Magnitude
-                                end)
-
-                                for _, meshPart in ipairs(meshParts) do
-                                    if isAborting then
-                                        return
-                                    end
-                                    if checkForBomb() then
-                                        game.StarterGui:SetCore("SendNotification", {
-                                            Title = "Bomb Detection",
-                                            Text = "Aborting, detected bomb nearby",
-                                            Duration = 3,
-                                        })
-                                        return
-                                    end
-                                    if player.Character.Humanoid.Health <= abortHealth then
-                                        game.StarterGui:SetCore("SendNotification", {
-                                            Title = "Player is hurt",
-                                            Text = "Aborted, player is hurt",
-                                        })
-                                        return
-                                    end
-                                    if not meshPartStillLootable(meshPart) then
-                                        continue
-                                    end
-                                    plrTween(meshPart.Position)
-                                    if meshPart.Parent and meshPart.Parent.Name == "Money" then
-                                        local args3 = { meshPart, "yQL", true }
-                                        robRemoteEvent:FireServer(unpack(args3))
-                                        task.wait(ProximityPromptTimeBet)
-                                        args3[3] = false
-                                        robRemoteEvent:FireServer(unpack(args3))
-                                        recordLootStat(true)
-                                    else
-                                        local args4 = { meshPart, "Vqe", true }
-                                        robRemoteEvent:FireServer(unpack(args4))
-                                        task.wait(ProximityPromptTimeBet)
-                                        args4[3] = false
-                                        robRemoteEvent:FireServer(unpack(args4))
-                                        recordLootStat(false)
-                                    end
-                                    task.wait(0.06)
+                                if meshPart.Transparency == 1 then
+                                    continue
                                 end
+                                plrTween(meshPart.Position)
+                                if meshPart.Parent and meshPart.Parent.Name == "Money" then
+                                    local args3 = { meshPart, "yQL", true }
+                                    robRemoteEvent:FireServer(unpack(args3))
+                                    task.wait(ProximityPromptTimeBet)
+                                    args3[3] = false
+                                    robRemoteEvent:FireServer(unpack(args3))
+                                    recordLootStat(true)
+                                else
+                                    local args4 = { meshPart, "Vqe", true }
+                                    robRemoteEvent:FireServer(unpack(args4))
+                                    task.wait(ProximityPromptTimeBet)
+                                    args4[3] = false
+                                    robRemoteEvent:FireServer(unpack(args4))
+                                    recordLootStat(false)
+                                end
+                                task.wait(0.1)
                             end
                         end
 
                         local function startAutoCollect()
-                            local ReplicatedStorage = game:GetService("ReplicatedStorage")
                             local Workspace = game:GetService("Workspace")
                             local Players = game:GetService("Players")
 
@@ -1909,10 +1883,9 @@ end
                             local Character = Player.Character or Player.CharacterAdded:Wait()
                             local HumanoidRootPart = Character:WaitForChild("HumanoidRootPart")
 
-                            local ProximityPromptTimeBet = 2.5
-                            local Range = 32
-                            local AUTO_LOOT_RETRY_MAX = 7
-                            local AUTO_LOOT_RETRY_GAP = 0.07
+                            local Collected = {}
+                            local ProximityPromptTimeBet = 2.3
+                            local Range = 30
                             local Robberies = {}
 
                             for _, d in ipairs(Workspace:GetDescendants()) do
@@ -1933,47 +1906,29 @@ end
                                 end
                             end)
 
-                            local function meshLootableAuto(m)
-                                return m and m.Parent and m:IsA("MeshPart") and m.Transparency < 0.98
-                            end
-
                             local function loot(folder)
-                                if not folder or not HumanoidRootPart then
-                                    return
-                                end
-                                for round = 1, AUTO_LOOT_RETRY_MAX do
-                                    if not (autorobBankClubToggle or autorobContainersToggle) then
-                                        return
-                                    end
-                                    if round > 1 then
-                                        task.wait(AUTO_LOOT_RETRY_GAP)
-                                    end
-                                    local batch = {}
-                                    for _, m in ipairs(folder:GetDescendants()) do
-                                        if meshLootableAuto(m) and (m.Position - HumanoidRootPart.Position).Magnitude <= Range then
-                                            table.insert(batch, m)
+                                for _, m in ipairs(folder:GetDescendants()) do
+                                    if m:IsA("MeshPart") and m.Transparency == 0 then
+                                        if HumanoidRootPart and not Collected[m] and (m.Position - HumanoidRootPart.Position).Magnitude <= Range then
+                                            Collected[m] = true
+                                            task.spawn(function()
+                                                local a
+                                                if m.Parent and m.Parent.Name == "Money" then
+                                                    a = { m, "yQL", true }
+                                                else
+                                                    a = { m, "Vqe", true }
+                                                end
+                                                robRemoteEvent:FireServer(unpack(a))
+                                                task.wait(ProximityPromptTimeBet)
+                                                a[3] = false
+                                                robRemoteEvent:FireServer(unpack(a))
+                                                local isMoneyLoot = m.Parent and m.Parent.Name == "Money"
+                                                recordLootStat(isMoneyLoot)
+                                                if m and m.Parent and m.Transparency == 0 then
+                                                    Collected[m] = nil
+                                                end
+                                            end)
                                         end
-                                    end
-                                    if #batch == 0 then
-                                        break
-                                    end
-                                    table.sort(batch, function(a, b)
-                                        return (a.Position - HumanoidRootPart.Position).Magnitude < (b.Position - HumanoidRootPart.Position).Magnitude
-                                    end)
-                                    for _, m in ipairs(batch) do
-                                        if not (autorobBankClubToggle or autorobContainersToggle) then
-                                            return
-                                        end
-                                        if not meshLootableAuto(m) or (m.Position - HumanoidRootPart.Position).Magnitude > Range + 2 then
-                                            continue
-                                        end
-                                        local isMoneyLoot = m.Parent and m.Parent.Name == "Money"
-                                        local a = isMoneyLoot and { m, "yQL", true } or { m, "Vqe", true }
-                                        robRemoteEvent:FireServer(unpack(a))
-                                        task.wait(ProximityPromptTimeBet)
-                                        a[3] = false
-                                        robRemoteEvent:FireServer(unpack(a))
-                                        recordLootStat(isMoneyLoot)
                                     end
                                 end
                             end
@@ -1984,7 +1939,7 @@ end
                                         loot(r)
                                     end
                                 end
-                                task.wait(0.35)
+                                task.wait(0.5)
                             end
                         end
 
@@ -2323,11 +2278,20 @@ end
                             tweenTo(Vector3.new(1058.7470703125, 5.733738899230957, 2218.6943359375))
                             task.wait(.5)
 
-                            local containerFolder = workspace.Robberies.ContainerRobberies
+                            local robberies = workspace:FindFirstChild("Robberies")
+                            local containerFolder = robberies and robberies:FindFirstChild("ContainerRobberies")
+                            if not containerFolder then
+                                warn("[robContainers] ContainerRobberies missing")
+                                return
+                            end
+
                             local containers = {}
 
                             local function getContainerRobberies(folder)
                                 local result = {}
+                                if not folder then
+                                    return result
+                                end
                                 for _, model in ipairs(folder:GetChildren()) do
                                     if model.Name == "ContainerRobbery" then
                                         table.insert(result, model)
@@ -2340,8 +2304,23 @@ end
 
                             local container1 = containers[1]
                             local container2 = containers[2]
+                            if not container1 or not container2 then
+                                warn("[robContainers] need 2 ContainerRobbery models, got " .. tostring(#containers))
+                                ensurePlayerInVehicle()
+                                tweenTo(Vector3.new(1656.3526611328125, -25.936052322387695, 2821.137451171875))
+                                performServerHop()
+                                return
+                            end
+
                             local con1Planks = container1:FindFirstChild("WoodPlanks", true)
                             local con2Planks = container2:FindFirstChild("WoodPlanks", true)
+                            if not con1Planks or not con2Planks then
+                                warn("[robContainers] WoodPlanks missing on container(s)")
+                                ensurePlayerInVehicle()
+                                tweenTo(Vector3.new(1656.3526611328125, -25.936052322387695, 2821.137451171875))
+                                performServerHop()
+                                return
+                            end
 
                             if con1Planks.Transparency == 1 then
                                 ensurePlayerInVehicle()
