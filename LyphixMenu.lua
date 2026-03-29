@@ -1234,7 +1234,7 @@ task.spawn(function()
                         local fireBombRemoteEvent = game:GetService("ReplicatedStorage"):WaitForChild("EJw"):WaitForChild("66291b15-ebda-4dbd-964e-cc89f86d2c82")
                         local robRemoteEvent = game:GetService("ReplicatedStorage"):WaitForChild("EJw"):WaitForChild("a3126821-130a-4135-80e1-1d28cece4007")
                         local sellRemoteEvent = game:GetService("ReplicatedStorage"):WaitForChild("EJw"):WaitForChild("eb233e6a-acb9-4169-acb9-129fe8cb06bb")
-                        local ProximityPromptTimeBet = 2.5
+                        local ProximityPromptTimeBet = 1.38
                         local VirtualInputManager = game:GetService("VirtualInputManager")
                         local key = Enum.KeyCode.E
                         local TweenService = game:GetService("TweenService")
@@ -1350,11 +1350,11 @@ task.spawn(function()
                             end
                             
                             VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.Q, false, game)
-                            task.wait(0.1)
+                            task.wait(0.055)
                             VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.Q, false, game)
-                            task.wait(0.1)
+                            task.wait(0.055)
                             VirtualInputManager:SendMouseButtonEvent(0, 0, 0, true, game, 0)
-                            task.wait(0.1)
+                            task.wait(0.055)
                             VirtualInputManager:SendMouseButtonEvent(0, 0, 0, false, game, 0)
                             
                             if invisibleEnabled then
@@ -1418,14 +1418,14 @@ task.spawn(function()
 
                         local function runBombThrowSequence()
                             EquipRemoteEvent:FireServer("Bomb")
-                            task.wait(0.45)
+                            task.wait(0.26)
                             if not (plr.Character and plr.Character:FindFirstChild("Bomb")) then
                                 equipBombToolFromInventory()
-                                task.wait(0.18)
+                                task.wait(0.09)
                             end
                             if not (plr.Character and plr.Character:FindFirstChild("Bomb")) then
                                 equipBombToolFromInventory()
-                                task.wait(0.22)
+                                task.wait(0.11)
                             end
                             local tool = plr.Character and plr.Character:FindFirstChild("Bomb")
                             if tool then
@@ -1433,7 +1433,7 @@ task.spawn(function()
                             else
                                 warn("[Bomb] Tool 'Bomb' not on character after equip — check inventory.")
                             end
-                            task.wait(0.5)
+                            task.wait(0.28)
                             fireBombRemoteEvent:FireServer()
                         end
 
@@ -1466,7 +1466,7 @@ task.spawn(function()
                         end
 
                         local function ensurePlayerInVehicleWithRetries(maxAttempts)
-                            maxAttempts = maxAttempts or 28
+                            maxAttempts = maxAttempts or 22
                             for _ = 1, maxAttempts do
                                 ensurePlayerInVehicle()
                                 local char = plr.Character
@@ -1479,7 +1479,7 @@ task.spawn(function()
                                         return true
                                     end
                                 end
-                                task.wait(0.12)
+                                task.wait(0.07)
                             end
                             return false
                         end
@@ -1532,7 +1532,7 @@ tweenTo = function(destination)
 
     if humanoid and humanoid.SeatPart ~= driveSeat then
         if hrp then hrp.CFrame = driveSeat.CFrame end
-        task.wait(0.1)
+        task.wait(0.06)
         driveSeat:Sit(humanoid)
         local t = 0
         while humanoid.SeatPart ~= driveSeat and t < 15 do
@@ -1540,7 +1540,7 @@ tweenTo = function(destination)
                 teleportActive = false
                 return
             end
-            task.wait(0.1)
+            task.wait(0.07)
             t = t + 1
         end
     end
@@ -1774,9 +1774,9 @@ end
                                                 currentPlrTween = nil
                                             end
                                         end)
-                                        task.wait(0.1)
-                                        ensurePlayerInVehicleWithRetries(30)
-                                        task.wait(0.15)
+                                        task.wait(0.06)
+                                        ensurePlayerInVehicleWithRetries(24)
+                                        task.wait(0.08)
                                         policeEvacToHopActive = true
                                         local tweenOk, tweenErr = pcall(function()
                                             tweenTo(SERVER_HOP_SAFE_POSITION)
@@ -1799,7 +1799,7 @@ end
                                         if needsSnap then
                                             pcall(lyphixSnapVehicleToPosition, SERVER_HOP_SAFE_POSITION)
                                         end
-                                        task.wait(0.35)
+                                        task.wait(0.18)
                                         isAborting = false
                                         if performServerHop then
                                             pcall(performServerHop)
@@ -1811,7 +1811,7 @@ end
 
                         -- Unterordner (verschachtelte Parts) + kurze Nachläufe; schmal nur unter diesem folder
                         local LOOT_SWEEP_MAX = 5
-                        local LOOT_SWEEP_GAP = 0.12
+                        local LOOT_SWEEP_GAP = 0.05
 
                         local function isLootableBasePart(ch)
                             return ch:IsA("BasePart") and ch.Transparency < 0.97
@@ -1954,7 +1954,7 @@ end
                                         robRemoteEvent:FireServer(unpack(args4))
                                         recordLootStat(false)
                                     end
-                                    task.wait(0.1)
+                                    task.wait(0.04)
                                 end
                             end
                         end
@@ -1968,7 +1968,7 @@ end
                             local HumanoidRootPart = Character:WaitForChild("HumanoidRootPart")
 
                             local Collected = {}
-                            local ProximityPromptTimeBet = 2.5
+                            local ProximityPromptTimeBet = 1.38
                             local Range = 30
                             local Robberies = {}
 
@@ -2023,7 +2023,7 @@ end
                                         loot(r)
                                     end
                                 end
-                                task.wait(0.5)
+                                task.wait(0.22)
                             end
                         end
 
@@ -2048,7 +2048,7 @@ end
                                     Duration = 3,
                                 })
                                 tweenTo(SERVER_HOP_SAFE_POSITION)
-                                task.wait(1)
+                                task.wait(0.4)
                                 performServerHop()
                                 return
                             end
@@ -2071,7 +2071,7 @@ end
                                     Duration = 3,
                                 })
                                 tweenTo(SERVER_HOP_SAFE_POSITION)
-                                task.wait(1)
+                                task.wait(0.4)
                                 performServerHop()
                                 return
                             end
@@ -2086,15 +2086,15 @@ end
                             end
                             ensurePlayerInVehicle()
                             MoveToDealer()
-                            task.wait(0.5)
+                            task.wait(0.16)
                             local argsBuy = { [1] = "Bomb", [2] = "Dealer" }
                             buyRemoteEvent:FireServer(unpack(argsBuy))
                             recordBombPurchase()
-                            local deadline = os.clock() + 10
+                            local deadline = os.clock() + 4.5
                             while not playerHasBombInInventory() and os.clock() < deadline do
-                                task.wait(0.12)
+                                task.wait(0.05)
                             end
-                            task.wait(0.2)
+                            task.wait(0.08)
                         end
 
                         local function robBankAndClub()
@@ -2121,11 +2121,11 @@ end
                             local clubSafe = Vector3.new(-1743.4300537109375, 11.124999046325684, 3049.96630859375)
 
                             ensurePlayerInVehicle()
-                            task.wait(.5)
+                            task.wait(0.18)
                             clickAtCoordinates(0.5, 0.9)
-                            task.wait(.5)
+                            task.wait(0.18)
                             tweenTo(Vector3.new(-1370.972412109375, 5.499999046325684, 3127.154541015625))
-                            task.wait(.5)
+                            task.wait(0.18)
 
                             local clubPart = workspace.Robberies["Club Robbery"].Club.Door.Accessory.Black
                             local bankPart = workspace.Robberies.BankRobbery.VaultDoor["Meshes/Tresor_Plane (2)"]
@@ -2135,11 +2135,12 @@ end
                             if autoSellToggle == true then
                                 ensurePlayerInVehicle()
                                 MoveToDealer()
-                                task.wait(0.5)
+                                task.wait(0.14)
                                 local args = { [1] = "Gold", [2] = "Dealer" }
                                 sellRemoteEvent:FireServer(unpack(args))
                                 sellRemoteEvent:FireServer(unpack(args))
                                 sellRemoteEvent:FireServer(unpack(args))
+                                task.wait(0.08)
                                 tweenTo(Vector3.new(-1370.972412109375, 5.499999046325684, 3127.154541015625))
                             end
 
@@ -2157,17 +2158,17 @@ end
 
                                 ensurePlayerInVehicle()
                                 tweenTo(clubPos)
-                                task.wait(0.5)
+                                task.wait(0.22)
                                 JumpOut()
-                                task.wait(0.5)
+                                task.wait(0.22)
 
                                 plrTween(Vector3.new(-1744.177001953125, 11.125, 3017.20263671875))
-                                task.wait(0.5)
+                                task.wait(0.22)
 
                                 runBombThrowSequence()
 
                                 plrTween(clubSafe)
-                                task.wait(2.7)
+                                task.wait(1.2)
                                 plrTween(clubStand)
 
                                 startPoliceMonitoring("Club")
@@ -2175,7 +2176,7 @@ end
                                 local safeFolder = workspace.Robberies["Club Robbery"].Club
                                 interactWithVisibleMeshParts(safeFolder:FindFirstChild("Items"))
                                 interactWithVisibleMeshParts(safeFolder:FindFirstChild("Money"))
-                                task.wait(0.5)
+                                task.wait(0.22)
 
                                 stopPoliceMonitoring()
                                 ensurePlayerInVehicle()
@@ -2199,28 +2200,27 @@ end
                                 buyBombFromDealerIfNeeded()
 
                                 tweenTo(Vector3.new(-1202.86181640625, 7.877995491027832, 3164.614501953125))
-                                tweenTo(Vector3.new(-1202.86181640625, 7.877995491027832, 3164.614501953125))
                                 JumpOut()
-                                task.wait(.5)
+                                task.wait(0.22)
                                 plrTween(Vector3.new(-1242.367919921875, 7.749999046325684, 3144.705322265625))
-                                task.wait(.5)
+                                task.wait(0.22)
                                 runBombThrowSequence()
                                 plrTween(Vector3.new(-1239.36669921875, 7.7235002517700195, 3114.240966796875))
                                 
                                 startPoliceMonitoring("Bank")
                                 
-                                task.wait(2.5)
+                                task.wait(1.1)
                                 local safeFolder = workspace.Robberies.BankRobbery
                                 plrTween(Vector3.new(-1249.6793212890625, 7.7235636711120605, 3121.9423828125))
-                                task.wait(6)
+                                task.wait(2.85)
                                 plrTween(Vector3.new(-1231.2696533203125, 7.7235002517700195, 3123.935546875))
-                                task.wait(6)
+                                task.wait(2.85)
                                 plrTween(Vector3.new(-1246.9879150390625, 7.7235002517700195, 3103.03955078125))
-                                task.wait(6)
+                                task.wait(2.85)
                                 plrTween(Vector3.new(-1235.13720703125, 7.7235002517700195, 3103.102783203125))
                                 
                                 stopPoliceMonitoring()
-                                task.wait(6)
+                                task.wait(2.85)
                                 ensurePlayerInVehicle()
                                 tweenTo(Vector3.new(-1143.7784423828125, 5.724719047546387, 3457.9404296875))
                             else
@@ -2248,17 +2248,17 @@ end
 
                                     ensurePlayerInVehicle()
                                     tweenTo(JewelerPos)
-                                    task.wait(0.5)
+                                    task.wait(0.22)
                                     JumpOut()
-                                    task.wait(0.5)
+                                    task.wait(0.22)
 
                                     plrTween(Vector3.new(-437.28814697265625, 21.223413467407227, 3553.262939453125))
-                                    task.wait(0.5)
+                                    task.wait(0.22)
 
                                     runBombThrowSequence()
 
                                     plrTween(JewelerSafe)
-                                    task.wait(2.7)
+                                    task.wait(1.2)
                                     plrTween(JewelerStand)
 
                                     startPoliceMonitoring("Jeweler")
@@ -2268,11 +2268,11 @@ end
                                     interactWithVisibleMeshParts(safeFolder:FindFirstChild("Money"))
                                     
                                     stopPoliceMonitoring()
-                                    task.wait(0.5)
+                                    task.wait(0.22)
 
                                     ensurePlayerInVehicle()
                                     tweenTo(SERVER_HOP_SAFE_POSITION)
-                                    task.wait(1)
+                                    task.wait(0.45)
                                     performServerHop()
                                 else
                                     game.StarterGui:SetCore("SendNotification", {
@@ -2280,7 +2280,7 @@ end
                                         Text = "Going to server hop",
                                     })
                                     tweenTo(SERVER_HOP_SAFE_POSITION)
-                                    task.wait(1)
+                                    task.wait(0.45)
                                     performServerHop()
                                 end
                             else
@@ -2289,7 +2289,7 @@ end
                                     Text = "Skipping Jeweler → Server Hop",
                                 })
                                 tweenTo(SERVER_HOP_SAFE_POSITION)
-                                task.wait(1)
+                                task.wait(0.45)
                                 performServerHop()
                             end
                         end
@@ -2299,7 +2299,7 @@ end
                                 return
                             end
                             tweenTo(Vector3.new(1058.7470703125, 5.733738899230957, 2218.6943359375))
-                            task.wait(.5)
+                            task.wait(0.2)
 
                             local robberies = workspace:FindFirstChild("Robberies")
                             local containerFolder = robberies and robberies:FindFirstChild("ContainerRobberies")
@@ -2347,22 +2347,21 @@ end
 
                             if con1Planks.Transparency == 1 then
                                 ensurePlayerInVehicle()
-                                task.wait(.5)
+                                task.wait(0.2)
                                 buyBombFromDealerIfNeeded()
                                 tweenTo(con1Planks.Position)
-                                tweenTo(con1Planks.Position)
-                                task.wait(0.5)
+                                task.wait(0.22)
                                 JumpOut()
-                                task.wait(0.5)
+                                task.wait(0.22)
                                 plrTween(con1Planks.Position)
-                                task.wait(0.5)
+                                task.wait(0.22)
                                 runBombThrowSequence()
                                 ensurePlayerInVehicle()
                                 tweenTo(Vector3.new(1096.401, 57.31, 2226.765))
-                                task.wait(2)
+                                task.wait(0.85)
                                 tweenTo(con1Planks.Position)
                                 JumpOut()
-                                task.wait(.5)
+                                task.wait(0.22)
                                 plrTween(con1Planks.Position)
                                 
                                 startPoliceMonitoring("Container 1")
@@ -2373,9 +2372,9 @@ end
                                 interactWithVisibleMeshParts2(container1:FindFirstChild("Money"))
                                 
                                 stopPoliceMonitoring()
-                                task.wait(.2)
+                                task.wait(0.06)
                                 ensurePlayerInVehicle()
-                                task.wait(.2)
+                                task.wait(0.06)
                                 tweenTo(Vector3.new(1096.401, 57.31, 2226.765))
                             else
                                 game.StarterGui:SetCore("SendNotification", {
@@ -2386,21 +2385,21 @@ end
 
                             if con2Planks.Transparency == 1 then
                                 ensurePlayerInVehicle()
-                                task.wait(.5)
+                                task.wait(0.2)
                                 buyBombFromDealerIfNeeded()
                                 tweenTo(con2Planks.Position)
-                                task.wait(0.5)
+                                task.wait(0.22)
                                 JumpOut()
-                                task.wait(.5)
+                                task.wait(0.22)
                                 plrTween(con2Planks.Position)
-                                task.wait(0.5)
+                                task.wait(0.22)
                                 runBombThrowSequence()
                                 ensurePlayerInVehicle()
                                 tweenTo(Vector3.new(1096.401, 57.31, 2226.765))
-                                task.wait(2)
+                                task.wait(0.85)
                                 tweenTo(con2Planks.Position)
                                 JumpOut()
-                                task.wait(0.5)
+                                task.wait(0.22)
                                 plrTween(con2Planks.Position)
                                 
                                 startPoliceMonitoring("Container 2")
@@ -2411,7 +2410,7 @@ end
                                 interactWithVisibleMeshParts2(container2:FindFirstChild("Money"))
                                 
                                 stopPoliceMonitoring()
-                                task.wait(0.5)
+                                task.wait(0.22)
                                 ensurePlayerInVehicle()
                                 tweenTo(Vector3.new(1656.3526611328125, -25.936052322387695, 2821.137451171875))
                                 performServerHop()
