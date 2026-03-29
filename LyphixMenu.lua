@@ -572,8 +572,27 @@ local isServerHopping = false
 -- Auto-Rob (Bank/Club): Third-Person-Kamera mit klarem Lebenszyklus — kein verwaister Heartbeat-Loop.
 local robBankCameraLockConn = nil
 local robBankCameraSmoothedCF = nil
+local robBankCameraLockSuspended = false
+
+local function setRobBankCameraLockSuspended(suspended)
+	robBankCameraLockSuspended = suspended and true or false
+	robBankCameraSmoothedCF = nil
+	local cam = workspace.CurrentCamera
+	if not cam then
+		return
+	end
+	if robBankCameraLockSuspended then
+		cam.CameraType = Enum.CameraType.Custom
+		local char = Players.LocalPlayer and Players.LocalPlayer.Character
+		local hum = char and char:FindFirstChildWhichIsA("Humanoid")
+		if hum then
+			cam.CameraSubject = hum
+		end
+	end
+end
 
 local function stopRobBankCameraLock()
+	robBankCameraLockSuspended = false
 	if robBankCameraLockConn then
 		robBankCameraLockConn:Disconnect()
 		robBankCameraLockConn = nil
@@ -1391,7 +1410,7 @@ task.spawn(function()
                                     return false
                                 end
                                 for _, d in ipairs(container:GetDescendants()) do
-                                    if d:IsA("Tool") and d.Name == "Bomb" then
+                                    if d:IsA("Tool") and string.lower(d.Name) == "bomb" then
                                         return true
                                     end
                                 end
@@ -1405,14 +1424,38 @@ task.spawn(function()
                             if not who then
                                 return 0
                             end
+                            local function bombStackContribution(tool)
+                                if not tool:IsA("Tool") or string.lower(tool.Name) ~= "bomb" then
+                                    return 0
+                                end
+                                for _, attrName in ipairs({ "Amount", "Count", "Stack", "Quantity", "Ammo" }) do
+                                    local v = tool:GetAttribute(attrName)
+                                    if type(v) == "number" and v > 0 then
+                                        return math.max(1, math.floor(v + 0.5))
+                                    end
+                                end
+                                for _, ch in ipairs(tool:GetChildren()) do
+                                    if ch:IsA("IntValue") or ch:IsA("NumberValue") then
+                                        local ln = string.lower(ch.Name)
+                                        if ln == "amount" or ln == "count" or ln == "stack" or ln == "quantity" or ln == "ammo" then
+                                            local v = ch.Value
+                                            if type(v) == "number" and v > 0 then
+                                                return math.max(1, math.floor(v + 0.5))
+                                            end
+                                        end
+                                    end
+                                end
+                                return 1
+                            end
                             local function bombCountIn(container)
                                 if not container then
                                     return 0
                                 end
                                 local n = 0
                                 for _, d in ipairs(container:GetDescendants()) do
-                                    if d:IsA("Tool") and d.Name == "Bomb" then
-                                        n = n + 1
+                                    local add = bombStackContribution(d)
+                                    if add > 0 then
+                                        n = n + add
                                     end
                                 end
                                 return n
@@ -1429,12 +1472,14 @@ task.spawn(function()
                             if not hum then
                                 return false
                             end
-                            if char:FindFirstChild("Bomb") and char:FindFirstChild("Bomb"):IsA("Tool") then
-                                return true
+                            for _, c in ipairs(char:GetChildren()) do
+                                if c:IsA("Tool") and string.lower(c.Name) == "bomb" then
+                                    return true
+                                end
                             end
                             local bombTool = nil
                             for _, d in ipairs(plr.Backpack:GetDescendants()) do
-                                if d:IsA("Tool") and d.Name == "Bomb" then
+                                if d:IsA("Tool") and string.lower(d.Name) == "bomb" then
                                     bombTool = d
                                     break
                                 end
@@ -1450,28 +1495,41 @@ task.spawn(function()
                                 hum:EquipTool(bombTool)
                             end)
                             task.wait(0.12)
-                            return char:FindFirstChild("Bomb") ~= nil
+                            for _, c in ipairs(char:GetChildren()) do
+                                if c:IsA("Tool") and string.lower(c.Name) == "bomb" then
+                                    return true
+                                end
+                            end
+                            return false
                         end
 
                         local function runBombThrowSequence()
-                            EquipRemoteEvent:FireServer("Bomb")
-                            task.wait(0.5)
-                            if not (plr.Character and plr.Character:FindFirstChild("Bomb")) then
-                                equipBombToolFromInventory()
-                                task.wait(0.15)
+                            -- Scriptable+Kamera-Lerp hängt hinter HRP-Drehung → Wurf zielt falsch (v. a. Juwelier). Kurz natives Follow-Cam.
+                            setRobBankCameraLockSuspended(true)
+                            local ok, err = pcall(function()
+                                EquipRemoteEvent:FireServer("Bomb")
+                                task.wait(0.5)
+                                if not (plr.Character and plr.Character:FindFirstChild("Bomb")) then
+                                    equipBombToolFromInventory()
+                                    task.wait(0.15)
+                                end
+                                if not (plr.Character and plr.Character:FindFirstChild("Bomb")) then
+                                    equipBombToolFromInventory()
+                                    task.wait(0.15)
+                                end
+                                local tool = plr.Character and plr.Character:FindFirstChild("Bomb")
+                                if tool then
+                                    SpawnBomb()
+                                else
+                                    warn("[Bomb] Tool 'Bomb' not on character after equip — check inventory.")
+                                end
+                                task.wait(0.5)
+                                fireBombRemoteEvent:FireServer()
+                            end)
+                            setRobBankCameraLockSuspended(false)
+                            if not ok then
+                                warn("[Bomb] runBombThrowSequence: " .. tostring(err))
                             end
-                            if not (plr.Character and plr.Character:FindFirstChild("Bomb")) then
-                                equipBombToolFromInventory()
-                                task.wait(0.15)
-                            end
-                            local tool = plr.Character and plr.Character:FindFirstChild("Bomb")
-                            if tool then
-                                SpawnBomb()
-                            else
-                                warn("[Bomb] Tool 'Bomb' not on character after equip — check inventory.")
-                            end
-                            task.wait(0.5)
-                            fireBombRemoteEvent:FireServer()
                         end
 
                         local function JumpOut()
@@ -2158,16 +2216,12 @@ end
                             lyphixDealerApproachActive = false
                         end
 
-                        -- Ein einziger Dealer-Stopp: optional komplett verkaufen + N Bomben kaufen (laut geplant offene Raubzüge)
-                        local function performSingleDealerTrip(bombsToPurchase, includeSell)
-                            if bombsToPurchase < 0 then
-                                bombsToPurchase = 0
-                            end
-                            if bombsToPurchase == 0 and not includeSell then
+                        -- Dealer: optional Verkauf + Bomben bis mindestens `minimumBombsRequired` (immer frisch gezählt, kein „blinder“ N-mal-Kauf).
+                        local function performSingleDealerTrip(minimumBombsRequired, includeSell)
+                            minimumBombsRequired = math.max(0, math.floor(tonumber(minimumBombsRequired) or 0))
+                            if minimumBombsRequired == 0 and not includeSell then
                                 return false
                             end
-                            local startBombs = countBombsInInventory()
-                            local targetBombs = startBombs + bombsToPurchase
                             ensurePlayerInVehicle()
                             MoveToDealer()
                             task.wait(0.16)
@@ -2178,15 +2232,21 @@ end
                                 sellRemoteEvent:FireServer(unpack(argsSell))
                                 task.wait(0.22)
                             end
-                            if bombsToPurchase > 0 then
+                            task.wait(0.1)
+                            local heldNow = countBombsInInventory()
+                            local toBuy = math.max(0, minimumBombsRequired - heldNow)
+                            if toBuy > 0 then
                                 local argsBuy = { [1] = "Bomb", [2] = "Dealer" }
-                                for _ = 1, bombsToPurchase do
+                                for _ = 1, toBuy do
+                                    if countBombsInInventory() >= minimumBombsRequired then
+                                        break
+                                    end
                                     buyRemoteEvent:FireServer(unpack(argsBuy))
                                     recordBombPurchase()
                                     task.wait(0.14)
                                 end
                                 local deadline = os.clock() + 6
-                                while countBombsInInventory() < targetBombs and os.clock() < deadline do
+                                while countBombsInInventory() < minimumBombsRequired and os.clock() < deadline do
                                     task.wait(0.05)
                                 end
                             end
@@ -2203,6 +2263,9 @@ end
 
                             stopRobBankCameraLock()
                             robBankCameraLockConn = RunService.RenderStepped:Connect(function(dt)
+                                if robBankCameraLockSuspended then
+                                    return
+                                end
                                 if not player then
                                     return
                                 end
@@ -2270,9 +2333,8 @@ end
                             local jewelerOpenAtPlan = (robMode == "Rob Club, Jeweler & Bank") and JewelerPart.Rotation == Vector3.new(0, -90, 0)
                             local plannedBombRobberies = (clubOpenAtPlan and 1 or 0) + (bankOpenAtPlan and 1 or 0) + (jewelerOpenAtPlan and 1 or 0)
                             local bombsHeld = countBombsInInventory()
-                            local bombsToBuyNow = math.max(0, plannedBombRobberies - bombsHeld)
-                            if autoSellToggle or bombsToBuyNow > 0 then
-                                performSingleDealerTrip(bombsToBuyNow, autoSellToggle)
+                            if autoSellToggle or bombsHeld < plannedBombRobberies then
+                                performSingleDealerTrip(plannedBombRobberies, autoSellToggle)
                                 ensurePlayerInVehicle()
                                 tweenTo(Vector3.new(-1370.972412109375, 5.499999046325684, 3127.154541015625))
                             end
@@ -2492,9 +2554,8 @@ end
                             local con2OpenAtPlan = con2Planks.Transparency == 1
                             local containerBombJobs = (con1OpenAtPlan and 1 or 0) + (con2OpenAtPlan and 1 or 0)
                             local contBombsHeld = countBombsInInventory()
-                            local contBombsToBuy = math.max(0, containerBombJobs - contBombsHeld)
-                            if autoSellToggle or contBombsToBuy > 0 then
-                                performSingleDealerTrip(contBombsToBuy, autoSellToggle)
+                            if autoSellToggle or contBombsHeld < containerBombJobs then
+                                performSingleDealerTrip(containerBombJobs, autoSellToggle)
                                 ensurePlayerInVehicle()
                                 tweenTo(Vector3.new(1058.7470703125, 5.733738899230957, 2218.6943359375))
                             end
