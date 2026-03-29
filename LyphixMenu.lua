@@ -297,14 +297,11 @@ local function findNewServer()
     end)
     
     if not success or not result or not result.data then
-        warn("[ServerHop] Error calling ServerList API")
         return nil
     end
     
     local goodServers = {}
     local anyServers = {}    
-    
-    print(string.format("[ServerHop] Found Servers: %d", #result.data))
     
     for _, server in ipairs(result.data) do
         if server.id and server.playing and server.maxPlayers then
@@ -329,15 +326,11 @@ local function findNewServer()
         end
     end
     
-    print(string.format("[ServerHop] Available Servers: %d (Good Servers: %d)", #anyServers, #goodServers))
-    
     if #goodServers > 0 then
         local selected = goodServers[math.random(1, #goodServers)]
-        print(string.format("[ServerHop] Selected Good Server: %s (%d/%d Players)", selected.id, selected.playing, selected.maxPlayers))
         return selected
     elseif #anyServers > 0 then
         local selected = anyServers[math.random(1, #anyServers)]
-        print(string.format("[ServerHop] Selected Server: %s (%d/%d Players)", selected.id, selected.playing, selected.maxPlayers))
         return selected
     end
     
@@ -531,7 +524,6 @@ local function sendSessionReport(info)
 	local requestFunc = request or http_request or (syn and syn.request) or (fluxus and fluxus.request)
 
 	if not requestFunc then
-		warn("ERROR: No HTTP request function available for webhooks.")
 		return false
 	end
 
@@ -563,7 +555,6 @@ local function sendSessionReport(info)
 		task.wait(0.65 * attempt)
 	end
 
-	warn("[Webhook] Failed after retries: " .. tostring(lastErr))
 	return false
 end
 
@@ -617,8 +608,6 @@ local function performServerHop()
 		end
 	end)
 
-	print("[ServerHop] Starting server hop...")
-
 	local policeNearby, policeDist = getPoliceNearbyInfo()
 	snapshotBalancesFromGui()
 	sessionMeta.hopIndex = (tonumber(sessionMeta.hopIndex) or 0) + 1
@@ -638,16 +627,9 @@ local function performServerHop()
     local q = queue_on_teleport or (syn and syn.queue_on_teleport)
     if q then
         q(payload)
-        print("[ServerHop] Auto-execution for next server set up.")
     end
 
     if policeNearby then
-        StarterGui:SetCore("SendNotification", {
-            Title = "Police Nearby",
-            Text = "Holding server hop position (no tween)...",
-            Duration = 2
-        })
-
         pcall(function()
             if LyphixCancelVehicleTween then
                 LyphixCancelVehicleTween()
@@ -678,19 +660,16 @@ local function performServerHop()
 
         local newServer = findNewServer()
         if newServer then
-            print(string.format("[ServerHop] Attempting to teleport to server %s", newServer.id))
             local success, err = pcall(function()
                 TeleportService:TeleportToPlaceInstance(game.PlaceId, newServer.id, player)
             end)
             if not success then
-                warn("[ServerHop] Direct teleport encountered an error: " .. err)
                 task.wait(2)
                 pcall(function()
                     TeleportService:Teleport(game.PlaceId, player)
                 end)
             end
         else
-            print("[ServerHop] No server found → Normal teleport")
             task.wait(1)
             pcall(function()
                 TeleportService:Teleport(game.PlaceId, player)
@@ -704,14 +683,6 @@ local function performServerHop()
     end)
 end
 
-local function notify(title, text)
-    StarterGui:SetCore("SendNotification", {
-        Title = title,
-        Text = text,
-        Duration = 2 
-    })
-end
-
 local gameId = game.PlaceId
 local autoRejoin = false
 
@@ -722,7 +693,6 @@ player.AncestryChanged:Connect(function(_, parent)
         local q = queue_on_teleport or (syn and syn.queue_on_teleport)
         if q then
             q(payload)
-            print("[ServerHop] Auto-execution for next server set up.")
         end
 
         task.wait(1)
@@ -750,17 +720,14 @@ task.spawn(function()
         if team then
             if team.Name == "Prisoner" then
                 if PrisonMessageSent == false then
-                    notify("MoonHub AutoRob", "You are in prison - Waiting for release.")
                     PrisonMessageSent = true
                     prisonCheckStarted = false
                 end
-                warn("[Prison Check] Team: Prisoner")
             elseif team.Name == "Citizen" then
                 if not prisonCheckStarted then
                     PrisonMessageSent = false
                     prisonCheckStarted = true
                     
-                    notify("MoonHub AutoRob", "Starting AutoRob...")  
                     if game.PlaceId == 7711635737 then
                         task.wait(0.5)
 
@@ -770,7 +737,6 @@ task.spawn(function()
                         end)
                         
                         if not success or not OrionLib then
-                            warn("[ERROR] Failed to load Orion Library: " .. tostring(err))
                             prisonCheckStarted = false
                             return
                         end
@@ -833,11 +799,6 @@ task.spawn(function()
                                 
                                 if not success then
                                     setclipboard("https://discord.gg/moon-hub")
-                                    game:GetService("StarterGui"):SetCore("SendNotification", {
-                                        Title = "Discord Invite";
-                                        Text = "Link copied. Please paste it in your browser.";
-                                        Duration = 5;
-                                    })
                                 end
                             end
                         })
@@ -1069,45 +1030,14 @@ task.spawn(function()
                             Callback = function()
                                 snapshotBalancesFromGui()
                                 persistSessionStats()
-                                local success = sendSessionReport({ reason = "manual" })
-                                if success then
-                                    OrionLib:MakeNotification({
-                                        Name = "Webhook",
-                                        Content = "Sessionbericht gesendet.",
-                                        Image = "rbxassetid://4483345998",
-                                        Time = 3
-                                    })
-                                else
-                                    OrionLib:MakeNotification({
-                                        Name = "Fehler",
-                                        Content = "Webhook konnte nicht gesendet werden (URL prüfen).",
-                                        Image = "rbxassetid://4483345998",
-                                        Time = 4
-                                    })
-                                end
+                                sendSessionReport({ reason = "manual" })
                             end
                         })
 
                         WebhookTab:AddButton({
                             Name = "Test Webhook",
                             Callback = function()
-                                local success = sendSessionReport({ reason = "test" })
-                                
-                                if success then
-                                    OrionLib:MakeNotification({
-                                        Name = "Success",
-                                        Content = "Webhook sent successfully!",
-                                        Image = "rbxassetid://4483345998",
-                                        Time = 3
-                                    })
-                                else
-                                    OrionLib:MakeNotification({
-                                        Name = "Error",
-                                        Content = "Failed to send webhook. Check URL.",
-                                        Image = "rbxassetid://4483345998",
-                                        Time = 3
-                                    })
-                                end
+                                sendSessionReport({ reason = "test" })
                             end
                         })
 
@@ -1144,11 +1074,6 @@ task.spawn(function()
                             Callback = function(Value)
                                 robMode = Value
                                 saveConfig()
-                                game.StarterGui:SetCore("SendNotification", {
-                                    Title = "Mode Changed",
-                                    Text = "Current Mode: " .. Value,
-                                    Duration = 3
-                                })
                             end
                         })
 
@@ -1506,7 +1431,7 @@ task.spawn(function()
                         local function runBombThrowSequence()
                             -- Scriptable+Kamera-Lerp hängt hinter HRP-Drehung → Wurf zielt falsch (v. a. Juwelier). Kurz natives Follow-Cam.
                             setRobBankCameraLockSuspended(true)
-                            local ok, err = pcall(function()
+                            pcall(function()
                                 EquipRemoteEvent:FireServer("Bomb")
                                 task.wait(0.5)
                                 if not (plr.Character and plr.Character:FindFirstChild("Bomb")) then
@@ -1520,16 +1445,11 @@ task.spawn(function()
                                 local tool = plr.Character and plr.Character:FindFirstChild("Bomb")
                                 if tool then
                                     SpawnBomb()
-                                else
-                                    warn("[Bomb] Tool 'Bomb' not on character after equip — check inventory.")
                                 end
                                 task.wait(0.5)
                                 fireBombRemoteEvent:FireServer()
                             end)
                             setRobBankCameraLockSuspended(false)
-                            if not ok then
-                                warn("[Bomb] runBombThrowSequence: " .. tostring(err))
-                            end
                         end
 
                         local function JumpOut()
@@ -1609,12 +1529,6 @@ tweenTo = function(destination)
     local vehicle = workspace.Vehicles:FindFirstChild(plr.Name)
     if not vehicle then
         teleportActive = false
-        OrionLib:MakeNotification({
-            Name    = "Error",
-            Content = "No vehicle found!",
-            Image   = "rbxassetid://79707149144849",
-            Duration = 3
-        })
         return
     end
 
@@ -1726,7 +1640,6 @@ end
                             local char = plr.Character
 
                             if not char or not char.PrimaryPart then
-                                warn("Character or PrimaryPart not available.")
                                 return
                             end
 
@@ -1820,15 +1733,12 @@ end
                                 policeCheckConnection = nil
                             end
                             policeCheckActive = false
-                            print("[Police Monitor] Stopped monitoring")
                         end
 
                         local function startPoliceMonitoring(robberyName)
                             if policeCheckActive then return end
                             policeCheckActive = true
                             isAborting = false
-                            
-                            print("[Police Monitor] Started monitoring for " .. robberyName)
                             
                             policeCheckConnection = RunService.Heartbeat:Connect(function()
                                 if not autorobBankClubToggle and not autorobContainersToggle then
@@ -1848,14 +1758,6 @@ end
                                     isAborting = true
                                     stopRobBankCameraLock()
 
-                                    game.StarterGui:SetCore("SendNotification", {
-                                        Title = "Police Nearby",
-                                        Text = string.format("Police nearby (%d studs) - Aborting %s robbery!", math.floor(distance), robberyName),
-                                        Duration = 5
-                                    })
-                                    
-                                    print(string.format("[Police Monitor] Police detected! Distance: %d studs - Aborting %s", math.floor(distance), robberyName))
-                                    
                                     if policeCheckConnection then
                                         policeCheckConnection:Disconnect()
                                         policeCheckConnection = nil
@@ -1882,9 +1784,6 @@ end
                                             tweenTo(SERVER_HOP_SAFE_POSITION)
                                         end)
                                         policeEvacToHopActive = false
-                                        if not tweenOk then
-                                            warn("[Police Evac] tweenTo failed: " .. tostring(tweenErr))
-                                        end
                                         local needsSnap = not tweenOk
                                         if not needsSnap then
                                             local vehiclesFolder = workspace:FindFirstChild("Vehicles")
@@ -1950,19 +1849,10 @@ end
                                         return
                                     end
                                     if checkForBomb() then
-                                        game.StarterGui:SetCore("SendNotification", {
-                                            Title = "Bomb Detection",
-                                            Text = "Aborting, detected bomb nearby",
-                                            Duration = 3,
-                                        })
                                         return
                                     end
                                     local hum = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
                                     if hum and hum.Health <= abortHealth then
-                                        game.StarterGui:SetCore("SendNotification", {
-                                            Title = "Player is hurt",
-                                            Text = "Aborting, player is hurt",
-                                        })
                                         return
                                     end
                                     if meshPart.Transparency >= 0.97 then
@@ -2020,19 +1910,10 @@ end
                                         return
                                     end
                                     if checkForBomb() then
-                                        game.StarterGui:SetCore("SendNotification", {
-                                            Title = "Bomb Detection",
-                                            Text = "Aborting, detected bomb nearby",
-                                            Duration = 3,
-                                        })
                                         return
                                     end
                                     local hum2 = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
                                     if hum2 and hum2.Health <= abortHealth then
-                                        game.StarterGui:SetCore("SendNotification", {
-                                            Title = "Player is hurt",
-                                            Text = "Aborted, player is hurt",
-                                        })
                                         return
                                     end
                                     if meshPart.Transparency >= 0.97 then
@@ -2166,21 +2047,11 @@ end
                             local character = player.Character or player.CharacterAdded:Wait()
                             local vehicle = workspace.Vehicles:FindFirstChild(player.Name)
                             if not vehicle then
-                                game.StarterGui:SetCore("SendNotification", {
-                                    Title = "Error",
-                                    Text = "No vehicle found.",
-                                    Duration = 3,
-                                })
                                 return
                             end
 
                             local dealers = workspace:FindFirstChild("Dealers")
                             if not dealers then
-                                game.StarterGui:SetCore("SendNotification", {
-                                    Title = "Error",
-                                    Text = "Dealers not found.",
-                                    Duration = 3,
-                                })
                                 tweenTo(SERVER_HOP_SAFE_POSITION)
                                 task.wait(1)
                                 performServerHop()
@@ -2199,11 +2070,6 @@ end
                             end
 
                             if not closest then
-                                game.StarterGui:SetCore("SendNotification", {
-                                    Title = "Error",
-                                    Text = "No dealer found.",
-                                    Duration = 3,
-                                })
                                 tweenTo(SERVER_HOP_SAFE_POSITION)
                                 task.wait(1)
                                 performServerHop()
@@ -2279,7 +2145,8 @@ end
                                 end
                                 local focusPart = nil
                                 local seat = hum.SeatPart
-                                if seat and seat:IsA("VehicleSeat") then
+                                local inVehicle = seat ~= nil and seat:IsA("VehicleSeat")
+                                if inVehicle then
                                     local veh = seat:FindFirstAncestorWhichIsA("Model")
                                     if veh and veh.PrimaryPart then
                                         focusPart = veh.PrimaryPart
@@ -2297,9 +2164,25 @@ end
                                     return
                                 end
                                 local pos = focusPart.Position
-                                local back = -focusPart.CFrame.LookVector
-                                local camPos = pos + back * 7 + Vector3.new(0, 3, 0)
-                                local lookAt = pos + Vector3.new(0, 1.85, 0)
+                                local lv = focusPart.CFrame.LookVector
+                                local camPos
+                                local lookAt
+                                if inVehicle then
+                                    local back = -lv
+                                    camPos = pos + back * 7 + Vector3.new(0, 2.4, 0)
+                                    lookAt = pos + Vector3.new(0, 1.35, 0)
+                                else
+                                    -- Zu Fuß: nur XZ-Blick (kein Hochziehen durch Pitch), tieferer Aim → Bombe flacher (Juwelier etc.)
+                                    local flat = Vector3.new(lv.X, 0, lv.Z)
+                                    if flat.Magnitude < 0.08 then
+                                        flat = Vector3.new(0, 0, -1)
+                                    else
+                                        flat = flat.Unit
+                                    end
+                                    local back = -flat
+                                    camPos = pos + back * 6.5 + Vector3.new(0, 1.55, 0)
+                                    lookAt = pos + flat * 5 + Vector3.new(0, 0.85, 0)
+                                end
                                 local targetCF = CFrame.new(camPos, lookAt)
                                 cam.CameraType = Enum.CameraType.Scriptable
                                 local alpha = math.clamp(15 * dt, 0, 1)
@@ -2344,10 +2227,6 @@ end
 
                             if clubPart.Rotation == Vector3.new(180, 0, 180) then
                                 clickAtCoordinates(0.5, 0.9)
-                                game.StarterGui:SetCore("SendNotification", {
-                                    Title = "Safe is open",
-                                    Text = "Going to rob",
-                                })
 
                                 ensurePlayerInVehicle()
                                 tweenTo(clubPos)
@@ -2374,20 +2253,12 @@ end
                                 ensurePlayerInVehicle()
                                 tweenTo(Vector3.new(-1370.972412109375, 5.499999046325684, 3127.154541015625))
                             else
-                                game.StarterGui:SetCore("SendNotification", {
-                                    Title = "Safe is not open",
-                                    Text = "Going to bank",
-                                })
                                 ensurePlayerInVehicle()
                                 tweenTo(Vector3.new(-1370.972412109375, 5.499999046325684, 3127.154541015625))
                             end
 
                             if bankLight2.Enabled == false and bankLight.Enabled == true then
                                 clickAtCoordinates(0.5, 0.9)
-                                game.StarterGui:SetCore("SendNotification", {
-                                    Title = "Bank is open",
-                                    Text = "Going to rob",
-                                })
 
                                 tweenTo(Vector3.new(-1202.86181640625, 7.877995491027832, 3164.614501953125))
                                 tweenTo(Vector3.new(-1202.86181640625, 7.877995491027832, 3164.614501953125))
@@ -2415,10 +2286,6 @@ end
                                 ensurePlayerInVehicle()
                                 tweenTo(Vector3.new(-1143.7784423828125, 5.724719047546387, 3457.9404296875))
                             else
-                                game.StarterGui:SetCore("SendNotification", {
-                                    Title = "Bank is not open",
-                                    Text = "Going to jeweler",
-                                })
                                 ensurePlayerInVehicle()
                                 tweenTo(Vector3.new(-1143.7784423828125, 5.724719047546387, 3457.9404296875))
                             end
@@ -2430,11 +2297,6 @@ end
 
                             if robMode == "Rob Club, Jeweler & Bank" then
                                 if JewelerPart.Rotation == Vector3.new(0, -90, 0) then
-                                    game.StarterGui:SetCore("SendNotification", {
-                                        Title = "Jeweler Safe is open",
-                                        Text = "Going to rob",
-                                    })
-
                                     local hasBomb = (plr.Character and plr.Character:FindFirstChild("Bomb")) or plr.Backpack:FindFirstChild("Bomb")
                                     if not hasBomb then
                                         ensurePlayerInVehicle()
@@ -2456,7 +2318,7 @@ end
                                     task.wait(0.5)
 
                                     setRobBankCameraLockSuspended(true)
-                                    local bombOk, bombErr = pcall(function()
+                                    pcall(function()
                                         local argsEquip = { [1] = "Bomb" }
                                         EquipRemoteEvent:FireServer(unpack(argsEquip))
                                         task.wait(0.5)
@@ -2464,17 +2326,12 @@ end
                                         local tool = plr.Character and plr.Character:FindFirstChild("Bomb")
                                         if tool then
                                             SpawnBomb()
-                                        else
-                                            warn("Tool 'Bomb' not found in the backpack!")
                                         end
 
                                         task.wait(0.5)
                                         fireBombRemoteEvent:FireServer()
                                     end)
                                     setRobBankCameraLockSuspended(false)
-                                    if not bombOk then
-                                        warn("[Jeweler] Bomb throw: " .. tostring(bombErr))
-                                    end
 
                                     plrTween(JewelerSafe)
                                     task.wait(2.7)
@@ -2494,19 +2351,11 @@ end
                                     task.wait(1)
                                     performServerHop()
                                 else
-                                    game.StarterGui:SetCore("SendNotification", {
-                                        Title = "Jeweler Safe is not open",
-                                        Text = "Going to server hop",
-                                    })
                                     tweenTo(JewelerHopPos)
                                     task.wait(1)
                                     performServerHop()
                                 end
                             else
-                                game.StarterGui:SetCore("SendNotification", {
-                                    Title = "Mode: Club & Bank",
-                                    Text = "Skipping Jeweler → Server Hop",
-                                })
                                 tweenTo(JewelerHopPos)
                                 task.wait(1)
                                 performServerHop()
@@ -2523,7 +2372,6 @@ end
                             local robberies = workspace:FindFirstChild("Robberies")
                             local containerFolder = robberies and robberies:FindFirstChild("ContainerRobberies")
                             if not containerFolder then
-                                warn("[robContainers] ContainerRobberies missing")
                                 return
                             end
 
@@ -2547,7 +2395,6 @@ end
                             local container1 = containers[1]
                             local container2 = containers[2]
                             if not container1 or not container2 then
-                                warn("[robContainers] need 2 ContainerRobbery models, got " .. tostring(#containers))
                                 ensurePlayerInVehicle()
                                 tweenTo(Vector3.new(1656.3526611328125, -25.936052322387695, 2821.137451171875))
                                 performServerHop()
@@ -2557,7 +2404,6 @@ end
                             local con1Planks = container1:FindFirstChild("WoodPlanks", true)
                             local con2Planks = container2:FindFirstChild("WoodPlanks", true)
                             if not con1Planks or not con2Planks then
-                                warn("[robContainers] WoodPlanks missing on container(s)")
                                 ensurePlayerInVehicle()
                                 tweenTo(Vector3.new(1656.3526611328125, -25.936052322387695, 2821.137451171875))
                                 performServerHop()
@@ -2602,11 +2448,6 @@ end
                                 ensurePlayerInVehicle()
                                 task.wait(0.2)
                                 tweenTo(Vector3.new(1096.401, 57.31, 2226.765))
-                            else
-                                game.StarterGui:SetCore("SendNotification", {
-                                    Title = "Container 1 not open",
-                                    Text = "Going to Container 2",
-                                })
                             end
 
                             if con2Planks.Transparency == 1 then
@@ -2636,11 +2477,6 @@ end
                                 ensurePlayerInVehicle()
                                 tweenTo(Vector3.new(1656.3526611328125, -25.936052322387695, 2821.137451171875))
                                 performServerHop()
-                            else
-                                game.StarterGui:SetCore("SendNotification", {
-                                    Title = "Container 2 not open",
-                                    Text = "Hopping server :^)",
-                                })
                             end
 
                             ensurePlayerInVehicle()
