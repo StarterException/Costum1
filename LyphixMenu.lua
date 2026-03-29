@@ -1401,6 +1401,21 @@ task.spawn(function()
                         local VirtualInputManager = game:GetService("VirtualInputManager")
                         local key = Enum.KeyCode.E
                         local TweenService = game:GetService("TweenService")
+                        local RunService = game:GetService("RunService")
+
+                        -- Easing für Tween (Dauer kommt weiterhin aus Slider: Distanz / Speed)
+                        local function lyphixEaseInOutCubic(t)
+                            t = math.clamp(t, 0, 1)
+                            if t < 0.5 then
+                                return 4 * t * t * t
+                            end
+                            return 1 - ((-2 * t + 2) ^ 3) / 2
+                        end
+
+                        local function lyphixSmoothstep(t)
+                            t = math.clamp(t, 0, 1)
+                            return t * t * (3 - 2 * t)
+                        end
 
                         local function clickAtCoordinates(scaleX, scaleY, duration)
                             local camera = game.Workspace.CurrentCamera
@@ -1683,36 +1698,45 @@ tweenTo = function(destination)
 
     if not teleportActive then return end
 
-    local startPos = Vector3.new(pivotNow.X, lowY, pivotNow.Z)
-
     if distance > 0.5 then
-        local targetCFrameLow = CFrame.new(targetPos.X, lowY, targetPos.Z)
-        local tweenDuration = distance / vehicleSpeedDivider
-        local TweenInfoToUse = TweenInfo.new(
-            tweenDuration,
-            Enum.EasingStyle.Linear,
-            Enum.EasingDirection.Out
-        )
+        local startFlat = Vector3.new(pivotNow.X, lowY, pivotNow.Z)
+        local endFlat = Vector3.new(targetPos.X, lowY, targetPos.Z)
+        local flatDelta = endFlat - startFlat
+        local flatDist = flatDelta.Magnitude
+        local flatDir = flatDist > 0.05 and flatDelta.Unit or Vector3.new(0, 0, -1)
+        local tweenDuration = math.max(flatDist / vehicleSpeedDivider, 0.06)
+        local t0 = os.clock()
 
-        local TweenValue = Instance.new("CFrameValue")
-        TweenValue.Value = vehicle:GetPivot()
-
-        currentTweenConn = TweenValue.Changed:Connect(function(newCFrame)
-            local fixedCFrame = CFrame.new(newCFrame.Position.X, lowY, newCFrame.Position.Z)
-            vehicle:PivotTo(fixedCFrame)
-            driveSeat.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
-            driveSeat.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
-        end)
-
-        currentTween = game:GetService("TweenService"):Create(TweenValue, TweenInfoToUse, { Value = targetCFrameLow })
-        currentTween:Play()
-        currentTween.Completed:Wait()
-
-        if currentTweenConn then
-            currentTweenConn:Disconnect()
-            currentTweenConn = nil
+        while true do
+            if isAborting or not teleportActive then
+                teleportActive = false
+                currentTween = nil
+                if currentTweenConn then
+                    currentTweenConn:Disconnect()
+                    currentTweenConn = nil
+                end
+                return
+            end
+            local u = math.clamp((os.clock() - t0) / tweenDuration, 0, 1)
+            local eh = lyphixEaseInOutCubic(u)
+            local xzPos = startFlat:Lerp(endFlat, eh)
+            local yBlend = lyphixSmoothstep(math.clamp((u - 0.68) / 0.32, 0, 1))
+            local y = lowY + (targetPos.Y - lowY) * yBlend
+            local pos = Vector3.new(xzPos.X, y, xzPos.Z)
+            vehicle:PivotTo(CFrame.lookAt(pos, pos + flatDir))
+            driveSeat.AssemblyLinearVelocity = Vector3.zero
+            driveSeat.AssemblyAngularVelocity = Vector3.zero
+            if u >= 1 then
+                break
+            end
+            RunService.Heartbeat:Wait()
         end
-        TweenValue:Destroy()
+    end
+
+    if isAborting or not teleportActive then
+        teleportActive = false
+        currentTween = nil
+        return
     end
 
     local finalCFrame = CFrame.new(targetPos)
@@ -1762,16 +1786,27 @@ end
                                 currentPlrTween = nil
                             end
 
-                            local tweenDuration = distance / plrTweenSpeed
+                            local tweenDuration = math.max(distance / plrTweenSpeed, 0.05)
+                            local startCF = char:GetPivot()
+                            local flatFrom = Vector3.new(startCF.Position.X, 0, startCF.Position.Z)
+                            local flatTo = Vector3.new(destination.X, 0, destination.Z)
+                            local walkDir = flatTo - flatFrom
+                            local targetCFrame
+                            if walkDir.Magnitude > 0.25 then
+                                local face = walkDir.Unit
+                                targetCFrame = CFrame.lookAt(destination, Vector3.new(destination.X, startCF.Position.Y, destination.Z) + face)
+                            else
+                                targetCFrame = CFrame.new(destination) * (startCF - startCF.Position)
+                            end
 
                             local TweenInfoToUse = TweenInfo.new(
                                 tweenDuration,
-                                Enum.EasingStyle.Linear,
-                                Enum.EasingDirection.Out
+                                Enum.EasingStyle.Quint,
+                                Enum.EasingDirection.InOut
                             )
 
                             local TweenValue = Instance.new("CFrameValue")
-                            TweenValue.Value = char:GetPivot()
+                            TweenValue.Value = startCF
 
                             TweenValue.Changed:Connect(function(newCFrame)
                                 if isAborting then
@@ -1780,7 +1815,6 @@ end
                                 char:PivotTo(newCFrame)
                             end)
 
-                            local targetCFrame = CFrame.new(destination)
                             local tween = TweenService:Create(TweenValue, TweenInfoToUse, { Value = targetCFrame })
 
                             currentPlrTween = tween
