@@ -1609,8 +1609,8 @@ tweenTo = function(destination)
         local flatDelta = endFlat - startFlat
         local flatDist = flatDelta.Magnitude
         local flatDir = flatDist > 0.05 and flatDelta.Unit or Vector3.new(0, 0, -1)
-        local dealerMul = lyphixDealerApproachActive and 2.6 or 1
-        local tweenDuration = math.max(flatDist / (vehicleSpeedDivider * dealerMul), lyphixDealerApproachActive and 0.035 or 0.06)
+        local dealerMul = lyphixDealerApproachActive and 4.2 or 1
+        local tweenDuration = math.max(flatDist / (vehicleSpeedDivider * dealerMul), lyphixDealerApproachActive and 0.03 or 0.06)
         local t0 = os.clock()
 
         while true do
@@ -2170,27 +2170,27 @@ end
                             local targetBombs = startBombs + bombsToPurchase
                             ensurePlayerInVehicle()
                             MoveToDealer()
-                            task.wait(0.5)
+                            task.wait(0.16)
                             if includeSell then
                                 local argsSell = { [1] = "Gold", [2] = "Dealer" }
                                 sellRemoteEvent:FireServer(unpack(argsSell))
                                 sellRemoteEvent:FireServer(unpack(argsSell))
                                 sellRemoteEvent:FireServer(unpack(argsSell))
-                                task.wait(0.5)
+                                task.wait(0.22)
                             end
                             if bombsToPurchase > 0 then
                                 local argsBuy = { [1] = "Bomb", [2] = "Dealer" }
                                 for _ = 1, bombsToPurchase do
                                     buyRemoteEvent:FireServer(unpack(argsBuy))
                                     recordBombPurchase()
-                                    task.wait(0.45)
+                                    task.wait(0.14)
                                 end
-                                local deadline = os.clock() + 10
+                                local deadline = os.clock() + 6
                                 while countBombsInInventory() < targetBombs and os.clock() < deadline do
-                                    task.wait(0.08)
+                                    task.wait(0.05)
                                 end
                             end
-                            task.wait(0.2)
+                            task.wait(0.06)
                             return true
                         end
 
