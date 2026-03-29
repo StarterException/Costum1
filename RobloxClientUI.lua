@@ -2023,7 +2023,16 @@ function OrionLib:MakeWindow(WindowConfig)
 			local ElementFunction = {}
 			function ElementFunction:AddLabel(Text)
 				local LAcc = OrionLib.Themes[OrionLib.SelectedTheme].Accent
-				local LabelFrame = AddThemeObject(SetChildren(SetProps(MakeElement("RoundFrame", Color3.fromRGB(255, 255, 255), 0, 16), {
+				-- Kein Child namens "Content" — in neuen Roblox-Builds ist Frame.Content kein gültiger Kind-Zugriff.
+				local labelTextEl = AddThemeObject(SetProps(MakeElement("Label", Text, 15), {
+					Size = UDim2.new(1, -36, 1, 0),
+					Position = UDim2.new(0, 24, 0, 0),
+					Font = Enum.Font.GothamBold,
+					TextSize = 15,
+					TextTransparency = 0.04,
+					Name = "CostumLabelText"
+				}), "Text")
+				AddThemeObject(SetChildren(SetProps(MakeElement("RoundFrame", Color3.fromRGB(255, 255, 255), 0, 16), {
 					Size = UDim2.new(1, 0, 0, 38),
 					BackgroundTransparency = 0.48,
 					Parent = ItemParent
@@ -2037,19 +2046,12 @@ function OrionLib:MakeWindow(WindowConfig)
 					}, {
 						Create("UICorner", {CornerRadius = UDim.new(1, 0)})
 					}),
-					AddThemeObject(SetProps(MakeElement("Label", Text, 15), {
-						Size = UDim2.new(1, -36, 1, 0),
-						Position = UDim2.new(0, 24, 0, 0),
-						Font = Enum.Font.GothamBold,
-						TextSize = 15,
-						TextTransparency = 0.04,
-						Name = "Content"
-					}), "Text")
+					labelTextEl
 				}), "Second")
 
 				local LabelFunction = {}
 				function LabelFunction:Set(ToChange)
-					LabelFrame.Content.Text = ToChange
+					labelTextEl.Text = ToChange
 				end
 				return LabelFunction
 			end
@@ -2058,6 +2060,25 @@ function OrionLib:MakeWindow(WindowConfig)
 				Content = Content or "Content"
 				local PAccent = OrionLib.Themes[OrionLib.SelectedTheme].Accent
 				local PSecond = OrionLib.Themes[OrionLib.SelectedTheme].Second
+
+				local paragraphTitleEl = AddThemeObject(SetProps(MakeElement("Label", Text, 19), {
+					Size = UDim2.new(1, -44, 0, 28),
+					Position = UDim2.new(0, 24, 0, 18),
+					Font = Enum.Font.GothamBold,
+					TextSize = 19,
+					TextTransparency = 0.02,
+					TextXAlignment = Enum.TextXAlignment.Left,
+					Name = "CostumParagraphTitle"
+				}), "Text")
+				local paragraphBodyEl = AddThemeObject(SetProps(MakeElement("Label", "", 14), {
+					Size = UDim2.new(1, -44, 0, 0),
+					Position = UDim2.new(0, 24, 0, 56),
+					Font = Enum.Font.GothamMedium,
+					TextTransparency = 0.12,
+					TextWrapped = true,
+					TextXAlignment = Enum.TextXAlignment.Left,
+					Name = "CostumParagraphBody"
+				}), "TextDark")
 
 				local ParagraphFrame = AddThemeObject(SetChildren(SetProps(MakeElement("RoundFrame", Color3.fromRGB(255, 255, 255), 0, 20), {
 					Size = UDim2.new(1, 0, 0, 96),
@@ -2082,15 +2103,7 @@ function OrionLib:MakeWindow(WindowConfig)
 							ColorSequenceKeypoint.new(1, PSecond)
 						})
 					}),
-					AddThemeObject(SetProps(MakeElement("Label", Text, 19), {
-						Size = UDim2.new(1, -44, 0, 28),
-						Position = UDim2.new(0, 24, 0, 18),
-						Font = Enum.Font.GothamBold,
-						TextSize = 19,
-						TextTransparency = 0.02,
-						TextXAlignment = Enum.TextXAlignment.Left,
-						Name = "Title"
-					}), "Text"),
+					paragraphTitleEl,
 					Create("Frame", {
 						Name = "TitleUnderline",
 						Size = UDim2.new(0, 48, 0, 2),
@@ -2101,40 +2114,32 @@ function OrionLib:MakeWindow(WindowConfig)
 					}, {
 						Create("UICorner", {CornerRadius = UDim.new(1, 0)})
 					}),
-					AddThemeObject(SetProps(MakeElement("Label", "", 14), {
-						Size = UDim2.new(1, -44, 0, 0),
-						Position = UDim2.new(0, 24, 0, 56),
-						Font = Enum.Font.GothamMedium,
-						TextTransparency = 0.12,
-						TextWrapped = true,
-						TextXAlignment = Enum.TextXAlignment.Left,
-						Name = "Content"
-					}), "TextDark")
+					paragraphBodyEl
 				}), "Second")
 
 				local function reflowParagraph()
-					local titleH = math.max(ParagraphFrame.Title.TextBounds.Y, 24)
-					ParagraphFrame.Title.Size = UDim2.new(1, -44, 0, titleH)
+					local titleH = math.max(paragraphTitleEl.TextBounds.Y, 24)
+					paragraphTitleEl.Size = UDim2.new(1, -44, 0, titleH)
 					local und = ParagraphFrame:FindFirstChild("TitleUnderline")
 					if und then
 						und.Position = UDim2.new(0, 24, 0, 16 + titleH + 4)
 					end
-					local bodyH = math.max(ParagraphFrame.Content.TextBounds.Y, 18)
-					ParagraphFrame.Content.Size = UDim2.new(1, -44, 0, bodyH)
-					ParagraphFrame.Content.Position = UDim2.new(0, 24, 0, 16 + titleH + 14)
+					local bodyH = math.max(paragraphBodyEl.TextBounds.Y, 18)
+					paragraphBodyEl.Size = UDim2.new(1, -44, 0, bodyH)
+					paragraphBodyEl.Position = UDim2.new(0, 24, 0, 16 + titleH + 14)
 					ParagraphFrame.Size = UDim2.new(1, 0, 0, 22 + titleH + 14 + bodyH + 22)
 				end
 
-				AddConnection(ParagraphFrame.Content:GetPropertyChangedSignal("Text"), reflowParagraph)
-				AddConnection(ParagraphFrame.Title:GetPropertyChangedSignal("Text"), reflowParagraph)
+				AddConnection(paragraphBodyEl:GetPropertyChangedSignal("Text"), reflowParagraph)
+				AddConnection(paragraphTitleEl:GetPropertyChangedSignal("Text"), reflowParagraph)
 
-				ParagraphFrame.Content.Text = Content
+				paragraphBodyEl.Text = Content
 				reflowParagraph()
 				task.defer(reflowParagraph)
 
 				local ParagraphFunction = {}
 				function ParagraphFunction:Set(ToChange)
-					ParagraphFrame.Content.Text = ToChange
+					paragraphBodyEl.Text = ToChange
 				end
 				return ParagraphFunction
 			end    
@@ -2150,17 +2155,19 @@ function OrionLib:MakeWindow(WindowConfig)
 					Size = UDim2.new(1, 0, 1, 0)
 				})
 
+				local buttonCaptionEl = AddThemeObject(SetProps(MakeElement("Label", ButtonConfig.Name, 15), {
+					Size = UDim2.new(1, -12, 1, 0),
+					Position = UDim2.new(0, 12, 0, 0),
+					Font = Enum.Font.GothamBold,
+					Name = "CostumButtonCaption"
+				}), "Text")
+
 				local ButtonFrame = AddThemeObject(SetChildren(SetProps(MakeElement("RoundFrame", Color3.fromRGB(255, 255, 255), 0, 14), {
 					Size = UDim2.new(1, 0, 0, 38),
 					BackgroundTransparency = 0.62,
 					Parent = ItemParent
 				}), {
-					AddThemeObject(SetProps(MakeElement("Label", ButtonConfig.Name, 15), {
-						Size = UDim2.new(1, -12, 1, 0),
-						Position = UDim2.new(0, 12, 0, 0),
-						Font = Enum.Font.GothamBold,
-						Name = "Content"
-					}), "Text"),
+					buttonCaptionEl,
 					AddThemeObject(SetProps(MakeElement("Image", ButtonConfig.Icon), {
 						Size = UDim2.new(0, 20, 0, 20),
 						Position = UDim2.new(1, -30, 0, 7),
@@ -2189,8 +2196,8 @@ function OrionLib:MakeWindow(WindowConfig)
 				end)
 
 				function Button:Set(ButtonText)
-					ButtonFrame.Content.Text = ButtonText
-				end	
+					buttonCaptionEl.Text = ButtonText
+				end
 
 				return Button
 			end    
