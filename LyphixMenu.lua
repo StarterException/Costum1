@@ -2182,18 +2182,12 @@ end
                             end
                             local player = game.Players.LocalPlayer
                             local character = player.Character or player.CharacterAdded:Wait()
-                            local humanoid = character:WaitForChild("Humanoid")
-                            local camera = game.Workspace.CurrentCamera
 
-                            local function lockCamera()
-                                local rootPart = character.HumanoidRootPart
-                                local backOffset = rootPart.CFrame.LookVector * -6
-                                local cameraPosition = rootPart.Position + backOffset + Vector3.new(0, 5, 0)
-                                local lookAtPosition = rootPart.Position + Vector3.new(0, 2, 0)
-                                camera.CFrame = CFrame.new(cameraPosition, lookAtPosition)
+                            -- Kein dauerhaftes Kamera-Lock (Heartbeat): das blockiert Fahrzeug-/Tween-Kamera und bricht Bewegung
+                            local cam = workspace.CurrentCamera
+                            if cam then
+                                cam.CameraType = Enum.CameraType.Custom
                             end
-
-                            game:GetService("RunService").Heartbeat:Connect(lockCamera)
 
                             local clubPos = Vector3.new(-1739.5330810546875, 11, 3052.31103515625)
                             local clubStand = Vector3.new(-1744.177001953125, 11.125, 3012.20263671875)
