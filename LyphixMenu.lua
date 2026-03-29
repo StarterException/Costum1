@@ -2085,9 +2085,3 @@ end
         end
     end
 end)
-
-else
-    game.Players.LocalPlayer:Kick("You are not allowed to use this script. If you have Premium and have already reset your ClientID, please be patient and wait.")
-    task.wait(3)
-    game:Shutdown()
-end
