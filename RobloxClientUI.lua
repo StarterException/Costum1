@@ -241,13 +241,42 @@ function OrionLib:IsRunning()
 	if not p then
 		return false
 	end
+	local CoreGui = game:GetService("CoreGui")
 	if gethui then
 		local h = gethui()
-		if h and p == h then
+		if h and (p == h or p:IsDescendantOf(h)) then
 			return true
 		end
 	end
-	return p == game:GetService("CoreGui")
+	return p == CoreGui or p:IsDescendantOf(CoreGui)
+end
+
+-- Xeno / ältere Umgebungen: Activated feuert oft nicht; mehrere Events + Debounce = ein Auslösen.
+local function BindWinChromeClick(guiButton, callback, debounceSec)
+	debounceSec = debounceSec or 0.24
+	local gate = false
+	local function runOnce()
+		if gate then
+			return
+		end
+		gate = true
+		task.delay(debounceSec, function()
+			gate = false
+		end)
+		callback()
+	end
+	AddConnection(guiButton.Activated, runOnce)
+	AddConnection(guiButton.MouseButton1Click, runOnce)
+	AddConnection(guiButton.MouseButton1Down, runOnce)
+	AddConnection(guiButton.InputBegan, function(_input, gameProcessed)
+		if gameProcessed then
+			return
+		end
+		local t = _input.UserInputType
+		if t == Enum.UserInputType.MouseButton1 or t == Enum.UserInputType.Touch then
+			runOnce()
+		end
+	end)
 end
 
 local function AddConnection(Signal, Function)
@@ -1647,8 +1676,7 @@ function OrionLib:MakeWindow(WindowConfig)
 		WindowConfig.CloseCallback()
 	end
 
-	-- Activated: zuverlässig für Maus, Touch und Gamepad (nicht doppelt mit MouseButton1Click kombinieren).
-	AddConnection(CloseBtn.Activated, performClose)
+	BindWinChromeClick(CloseBtn, performClose)
 
 	AddConnection(UserInputService.InputBegan, function(Input)
 		if Input.KeyCode == Enum.KeyCode.RightShift and UIHidden then
@@ -1688,7 +1716,7 @@ function OrionLib:MakeWindow(WindowConfig)
 		end)
 	end
 
-	AddConnection(MinimizeBtn.Activated, performMinimize)
+	BindWinChromeClick(MinimizeBtn, performMinimize)
 
 	local function LoadSequence()
 		MainWindow.Visible = false
