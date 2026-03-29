@@ -249,8 +249,11 @@ function OrionLib:IsRunning()
 	return ok and live == true
 end
 
--- Nur Click + Up (mit Debounce). Kein InputBegan/MouseButton1Down — triggert unter Executors oft phantom beim Aufbau → UI sofort weg.
+-- Schließen/Minimize: Click + Up + Activated (Executors); gemeinsamer Gate gegen Doppelfire.
 local function BindWinChromeClick(guiButton, callback, debounceSec)
+	if not guiButton or not guiButton.MouseButton1Click then
+		return
+	end
 	debounceSec = debounceSec or 0.22
 	local gate = false
 	local function runOnce()
@@ -258,13 +261,15 @@ local function BindWinChromeClick(guiButton, callback, debounceSec)
 			return
 		end
 		gate = true
-		task.delay(debounceSec, function()
+		task.spawn(function()
+			task.wait(debounceSec)
 			gate = false
 		end)
 		callback()
 	end
 	AddConnection(guiButton.MouseButton1Click, runOnce)
 	AddConnection(guiButton.MouseButton1Up, runOnce)
+	AddConnection(guiButton.Activated, runOnce)
 end
 
 local function AddConnection(Signal, Function)
@@ -835,12 +840,14 @@ function OrionLib:MakeWindow(WindowConfig)
 	end
 	task.defer(RefreshTabHolderCanvas)
 
+	-- Nur Darstellung; echte Klicks über ChromeCloseHit (darüber, sonst fangen Stroke/Divider/Theme zu).
 	local CloseBtn = SetChildren(SetProps(MakeElement("Button"), {
 		Size = UDim2.new(0.5, 0, 1, 0),
 		Position = UDim2.new(0.5, 0, 0, 0),
 		BackgroundTransparency = 1,
-		ZIndex = 16,
-		Selectable = true,
+		ZIndex = 12,
+		Active = false,
+		Selectable = false,
 		AutoButtonColor = false
 	}), {
 		AddThemeObject(SetProps(MakeElement("Image", "x"), {
@@ -855,8 +862,9 @@ function OrionLib:MakeWindow(WindowConfig)
 	local MinimizeBtn = SetChildren(SetProps(MakeElement("Button"), {
 		Size = UDim2.new(0.5, 0, 1, 0),
 		BackgroundTransparency = 1,
-		ZIndex = 16,
-		Selectable = true,
+		ZIndex = 12,
+		Active = false,
+		Selectable = false,
 		AutoButtonColor = false
 	}), {
 		AddThemeObject(SetProps(MakeElement("Image", "minus"), {
@@ -866,6 +874,30 @@ function OrionLib:MakeWindow(WindowConfig)
 			Active = false,
 			Selectable = false
 		}), "Text")
+	})
+
+	-- Unsichtbare Volltreffer über Minimize (links) / Close (rechts) — WinControls 88px breit ab (1,-98).
+	local ChromeMinHit = SetProps(MakeElement("Button"), {
+		Name = "ChromeMinHit",
+		Text = "",
+		BackgroundTransparency = 1,
+		AutoButtonColor = false,
+		Size = UDim2.new(0, 44, 0, 38),
+		Position = UDim2.new(1, -98, 0, 8),
+		ZIndex = 28,
+		Active = true,
+		Selectable = true
+	})
+	local ChromeCloseHit = SetProps(MakeElement("Button"), {
+		Name = "ChromeCloseHit",
+		Text = "",
+		BackgroundTransparency = 1,
+		AutoButtonColor = false,
+		Size = UDim2.new(0, 44, 0, 38),
+		Position = UDim2.new(1, -54, 0, 8),
+		ZIndex = 28,
+		Active = true,
+		Selectable = true
 	})
 
 	-- Nur linker Titelbereich: volle Breite würde die TopBar überdecken und Close/Minimize blockieren.
@@ -1119,11 +1151,15 @@ function OrionLib:MakeWindow(WindowConfig)
 				AddThemeObject(SetProps(MakeElement("Frame"), {
 					Size = UDim2.new(0, 1, 0.55, 0),
 					Position = UDim2.new(0.5, 0, 0.22, 0),
-					BackgroundTransparency = 0.6
-				}), "Stroke"), 
+					BackgroundTransparency = 0.6,
+					Active = false,
+					Selectable = false
+				}), "Stroke"),
 				CloseBtn,
 				MinimizeBtn
-			}), "Second"), 
+			}), "Second"),
+			ChromeMinHit,
+			ChromeCloseHit
 		}),
 		DragPoint,
 		WindowStuff
@@ -1644,18 +1680,20 @@ function OrionLib:MakeWindow(WindowConfig)
 
 	local TTextCol = OrionLib.Themes[OrionLib.SelectedTheme].Text
 	local TAcc2Col = OrionLib.Themes[OrionLib.SelectedTheme].Accent2
-	local function wireWinHover(btn, glyphName)
-		local g = glyphName and btn:FindFirstChild(glyphName) or btn:FindFirstChild("Glyph") or btn:FindFirstChild("Ico")
-		if not g or not g:IsA("ImageLabel") then return end
-		AddConnection(btn.MouseEnter, function()
+	local function wireChromeHitHover(hitBtn, iconHolder, glyphName)
+		local g = iconHolder and glyphName and iconHolder:FindFirstChild(glyphName)
+		if not g or not g:IsA("ImageLabel") then
+			return
+		end
+		AddConnection(hitBtn.MouseEnter, function()
 			TweenService:Create(g, TweenInfo.new(0.18, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {ImageColor3 = TAcc2Col, ImageTransparency = 0.02}):Play()
 		end)
-		AddConnection(btn.MouseLeave, function()
+		AddConnection(hitBtn.MouseLeave, function()
 			TweenService:Create(g, TweenInfo.new(0.22, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {ImageColor3 = TTextCol, ImageTransparency = 0}):Play()
 		end)
 	end
-	wireWinHover(CloseBtn, "Glyph")
-	wireWinHover(MinimizeBtn, "Ico")
+	wireChromeHitHover(ChromeMinHit, MinimizeBtn, "Ico")
+	wireChromeHitHover(ChromeCloseHit, CloseBtn, "Glyph")
 
 	local function performClose()
 		if not MainWindow or not MainWindow.Parent then
@@ -1715,11 +1753,11 @@ function OrionLib:MakeWindow(WindowConfig)
 			return
 		end
 		winChromeBindsDone = true
-		BindWinChromeClick(CloseBtn, performClose)
-		BindWinChromeClick(MinimizeBtn, performMinimize)
+		BindWinChromeClick(ChromeCloseHit, performClose)
+		BindWinChromeClick(ChromeMinHit, performMinimize)
 		pcall(function()
-			CloseBtn.Interactable = true
-			MinimizeBtn.Interactable = true
+			ChromeCloseHit.Interactable = true
+			ChromeMinHit.Interactable = true
 		end)
 	end
 
