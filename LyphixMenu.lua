@@ -43,8 +43,53 @@ local function lyphixTeleportAutoExecPayload()
 	return string.format("loadstring(game:HttpGet(%q))()", LYPHIX_MENU_SCRIPT_URL)
 end
 
+-- Server-Hop-Sammelpunkt (Fahrzeug) — auch außerhalb des Menü-Blocks für performServerHop
+local SERVER_HOP_SAFE_POSITION = Vector3.new(-1292.9005126953125, -423.63556671142578, 3685.330810546875)
+
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
+
+-- Sofortiges Setzen des Fahrzeugs (kein Tween) — z. B. Server-Hop bei Police in der Nähe
+local function lyphixSnapVehicleToPosition(targetPos)
+	local plr = Players.LocalPlayer
+	if not plr then
+		return
+	end
+	local character = plr.Character or plr.CharacterAdded:Wait()
+	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+	local vehiclesFolder = workspace:FindFirstChild("Vehicles")
+	local vehicle = vehiclesFolder and vehiclesFolder:FindFirstChild(plr.Name)
+	if not vehicle or not humanoid then
+		return
+	end
+	local driveSeat = vehicle:FindFirstChild("DriveSeat", true) or vehicle:FindFirstChildWhichIsA("VehicleSeat", true)
+	if not driveSeat then
+		return
+	end
+	vehicle.PrimaryPart = driveSeat
+	if humanoid.SeatPart ~= driveSeat then
+		local hrp = character:FindFirstChild("HumanoidRootPart")
+		if hrp then
+			hrp.CFrame = driveSeat.CFrame
+		end
+		task.wait(0.08)
+		driveSeat:Sit(humanoid)
+		local t = 0
+		while humanoid.SeatPart ~= driveSeat and t < 24 do
+			task.wait(0.05)
+			t = t + 1
+		end
+	end
+	driveSeat.AssemblyLinearVelocity = Vector3.zero
+	driveSeat.AssemblyAngularVelocity = Vector3.zero
+	local targetCF = typeof(targetPos) == "CFrame" and targetPos or CFrame.new(targetPos)
+	vehicle:PivotTo(targetCF)
+	if character:FindFirstChildOfClass("Humanoid") and humanoid.SeatPart == nil then
+		driveSeat:Sit(humanoid)
+	end
+	vehicle:SetAttribute("ParkingBrake", true)
+	vehicle:SetAttribute("Locked", true)
+end
 
 local webhookStats = {
 	bombsPurchased = 0,
@@ -726,15 +771,18 @@ local function performServerHop()
     if policeNearby then
         StarterGui:SetCore("SendNotification", {
             Title = "Police Nearby",
-            Text = "Changing server hop position...",
+            Text = "Holding server hop position (no tween)...",
             Duration = 2
         })
 
-        if tweenTo then
-            pcall(function()
-                tweenTo(Vector3.new(-1292.9005126953125, -423.63556671142578, 3685.330810546875))
-            end)
-        end
+        pcall(function()
+            if LyphixCancelVehicleTween then
+                LyphixCancelVehicleTween()
+            end
+        end)
+        pcall(function()
+            lyphixSnapVehicleToPosition(SERVER_HOP_SAFE_POSITION)
+        end)
 
         isServerHopping = true
         player:Kick("Searching for new server. Server hop happens automatically...")
@@ -1385,6 +1433,10 @@ task.spawn(function()
 
                         LyphixCancelVehicleTween = stopCurrentTween
 
+                        local isAborting = false
+                        local policeCheckActive = false
+                        local policeCheckConnection = nil
+
                         local function checkForBomb()
                             if not bombDetectionEnabled then return false end
 
@@ -1486,7 +1538,17 @@ task.spawn(function()
                             end
                         end
 
+                        -- Sofort Fahrzeug setzen (kein langes tweenTo) — z. B. Police-Abort: an Server-Hop-Punkt bleiben
+                        local function snapVehicleToPosition(targetPos)
+                            lyphixSnapVehicleToPosition(targetPos)
+                        end
+
+                        local currentPlrTween = nil
+
 tweenTo = function(destination)
+    if isAborting then
+        return
+    end
     clickAtCoordinates(0.45, 0.34)
     clickAtCoordinates(0.5, 0.9)
     if teleportActive then
@@ -1595,6 +1657,9 @@ tweenTo = function(destination)
 end
 
                         local function plrTween(destination)
+                            if isAborting then
+                                return
+                            end
                             local plr = game.Players.LocalPlayer
                             local char = plr.Character
 
@@ -1606,8 +1671,21 @@ end
                             local distance = (char.PrimaryPart.Position - destination).Magnitude
 
                             if PlayerTeleportEnabled and distance < 300 then
+                                if currentPlrTween then
+                                    pcall(function()
+                                        currentPlrTween:Cancel()
+                                    end)
+                                    currentPlrTween = nil
+                                end
                                 char:PivotTo(CFrame.new(destination))
                                 return
+                            end
+
+                            if currentPlrTween then
+                                pcall(function()
+                                    currentPlrTween:Cancel()
+                                end)
+                                currentPlrTween = nil
                             end
 
                             local tweenDuration = distance / plrTweenSpeed
@@ -1622,20 +1700,21 @@ end
                             TweenValue.Value = char:GetPivot()
 
                             TweenValue.Changed:Connect(function(newCFrame)
+                                if isAborting then
+                                    return
+                                end
                                 char:PivotTo(newCFrame)
                             end)
 
                             local targetCFrame = CFrame.new(destination)
                             local tween = TweenService:Create(TweenValue, TweenInfoToUse, { Value = targetCFrame })
 
+                            currentPlrTween = tween
                             tween:Play()
                             tween.Completed:Wait()
+                            currentPlrTween = nil
                             TweenValue:Destroy()
                         end
-
-                        local policeCheckActive = false
-                        local policeCheckConnection = nil
-                        local isAborting = false
 
                         local function checkPoliceNearby()
                             local player = game.Players.LocalPlayer
@@ -1707,33 +1786,25 @@ end
                                         policeCheckConnection = nil
                                     end
                                     policeCheckActive = false
-                                    
+
                                     task.spawn(function()
                                         pcall(function()
-                                            local character = player.Character
-                                            if character then
-                                                local humanoid = character:FindFirstChild("Humanoid")
-                                                if humanoid and humanoid.SeatPart then
-                                                    humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
-                                                end
+                                            if LyphixCancelVehicleTween then
+                                                LyphixCancelVehicleTween()
                                             end
                                         end)
-                                        
-                                        task.wait(0.5)
-                                        
                                         pcall(function()
-                                            if tweenTo then
-                                                tweenTo(Vector3.new(-1292.9005126953125, -423.63556671142578, 3685.330810546875))
-                                            else
-                                                local char = player.Character
-                                                if char and char:FindFirstChild("HumanoidRootPart") then
-                                                    char.HumanoidRootPart.CFrame = CFrame.new(Vector3.new(-1292.9005126953125, -423.63556671142578, 3685.330810546875))
-                                                end
+                                            if currentPlrTween then
+                                                currentPlrTween:Cancel()
+                                                currentPlrTween = nil
                                             end
                                         end)
-                                        
-                                        task.wait(1)
-                                        
+                                        pcall(ensurePlayerInVehicle)
+                                        task.wait(0.1)
+                                        pcall(function()
+                                            snapVehicleToPosition(SERVER_HOP_SAFE_POSITION)
+                                        end)
+                                        task.wait(0.4)
                                         if performServerHop then
                                             pcall(performServerHop)
                                         end
@@ -1742,7 +1813,14 @@ end
                             end)
                         end
 
-                        -- Wie Original (message.txt): direkte Kinder, Transparency == 0, ein schneller Pass
+                        -- Unterordner (verschachtelte Parts) + kurze Nachläufe; schmal nur unter diesem folder
+                        local LOOT_SWEEP_MAX = 5
+                        local LOOT_SWEEP_GAP = 0.12
+
+                        local function isLootableBasePart(ch)
+                            return ch:IsA("BasePart") and ch.Transparency < 0.97
+                        end
+
                         local function interactWithVisibleMeshParts(folder)
                             if not folder or isAborting then
                                 return
@@ -1754,56 +1832,61 @@ end
                                 return
                             end
 
-                            local meshParts = {}
-                            for _, meshPart in ipairs(folder:GetChildren()) do
-                                if meshPart:IsA("MeshPart") and meshPart.Transparency == 0 then
-                                    table.insert(meshParts, meshPart)
+                            for sweep = 1, LOOT_SWEEP_MAX do
+                                if sweep > 1 then
+                                    task.wait(LOOT_SWEEP_GAP)
                                 end
-                            end
+                                local meshParts = {}
+                                for _, ch in ipairs(folder:GetDescendants()) do
+                                    if isLootableBasePart(ch) then
+                                        table.insert(meshParts, ch)
+                                    end
+                                end
+                                if #meshParts == 0 then
+                                    break
+                                end
+                                table.sort(meshParts, function(a, b)
+                                    return (a.Position - hrp.Position).Magnitude < (b.Position - hrp.Position).Magnitude
+                                end)
 
-                            table.sort(meshParts, function(a, b)
-                                local aDist = (a.Position - hrp.Position).Magnitude
-                                local bDist = (b.Position - hrp.Position).Magnitude
-                                return aDist < bDist
-                            end)
-
-                            for _, meshPart in ipairs(meshParts) do
-                                if isAborting then
-                                    return
-                                end
-                                if checkForBomb() then
-                                    game.StarterGui:SetCore("SendNotification", {
-                                        Title = "Bomb Detection",
-                                        Text = "Aborting, detected bomb nearby",
-                                        Duration = 3,
-                                    })
-                                    return
-                                end
-                                local hum = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
-                                if hum and hum.Health <= abortHealth then
-                                    game.StarterGui:SetCore("SendNotification", {
-                                        Title = "Player is hurt",
-                                        Text = "Aborting, player is hurt",
-                                    })
-                                    return
-                                end
-                                if meshPart.Transparency == 1 then
-                                    continue
-                                end
-                                if meshPart.Parent and meshPart.Parent.Name == "Money" then
-                                    local args = { meshPart, "yQL", true }
-                                    robRemoteEvent:FireServer(unpack(args))
-                                    task.wait(ProximityPromptTimeBet)
-                                    args[3] = false
-                                    robRemoteEvent:FireServer(unpack(args))
-                                    recordLootStat(true)
-                                else
-                                    local args = { meshPart, "Vqe", true }
-                                    robRemoteEvent:FireServer(unpack(args))
-                                    task.wait(ProximityPromptTimeBet)
-                                    args[3] = false
-                                    robRemoteEvent:FireServer(unpack(args))
-                                    recordLootStat(false)
+                                for _, meshPart in ipairs(meshParts) do
+                                    if isAborting then
+                                        return
+                                    end
+                                    if checkForBomb() then
+                                        game.StarterGui:SetCore("SendNotification", {
+                                            Title = "Bomb Detection",
+                                            Text = "Aborting, detected bomb nearby",
+                                            Duration = 3,
+                                        })
+                                        return
+                                    end
+                                    local hum = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
+                                    if hum and hum.Health <= abortHealth then
+                                        game.StarterGui:SetCore("SendNotification", {
+                                            Title = "Player is hurt",
+                                            Text = "Aborting, player is hurt",
+                                        })
+                                        return
+                                    end
+                                    if meshPart.Transparency >= 0.97 then
+                                        continue
+                                    end
+                                    if meshPart.Parent and meshPart.Parent.Name == "Money" then
+                                        local args = { meshPart, "yQL", true }
+                                        robRemoteEvent:FireServer(unpack(args))
+                                        task.wait(ProximityPromptTimeBet)
+                                        args[3] = false
+                                        robRemoteEvent:FireServer(unpack(args))
+                                        recordLootStat(true)
+                                    else
+                                        local args = { meshPart, "Vqe", true }
+                                        robRemoteEvent:FireServer(unpack(args))
+                                        task.wait(ProximityPromptTimeBet)
+                                        args[3] = false
+                                        robRemoteEvent:FireServer(unpack(args))
+                                        recordLootStat(false)
+                                    end
                                 end
                             end
                         end
@@ -1819,59 +1902,64 @@ end
                                 return
                             end
 
-                            local meshParts = {}
-                            for _, meshPart in ipairs(folder:GetChildren()) do
-                                if meshPart:IsA("MeshPart") and meshPart.Transparency == 0 then
-                                    table.insert(meshParts, meshPart)
+                            for sweep = 1, LOOT_SWEEP_MAX do
+                                if sweep > 1 then
+                                    task.wait(LOOT_SWEEP_GAP)
                                 end
-                            end
+                                local meshParts = {}
+                                for _, ch in ipairs(folder:GetDescendants()) do
+                                    if isLootableBasePart(ch) then
+                                        table.insert(meshParts, ch)
+                                    end
+                                end
+                                if #meshParts == 0 then
+                                    break
+                                end
+                                table.sort(meshParts, function(a, b)
+                                    return (a.Position - hrp.Position).Magnitude < (b.Position - hrp.Position).Magnitude
+                                end)
 
-                            table.sort(meshParts, function(a, b)
-                                local aDist = (a.Position - hrp.Position).Magnitude
-                                local bDist = (b.Position - hrp.Position).Magnitude
-                                return aDist < bDist
-                            end)
-
-                            for _, meshPart in ipairs(meshParts) do
-                                if isAborting then
-                                    return
+                                for _, meshPart in ipairs(meshParts) do
+                                    if isAborting then
+                                        return
+                                    end
+                                    if checkForBomb() then
+                                        game.StarterGui:SetCore("SendNotification", {
+                                            Title = "Bomb Detection",
+                                            Text = "Aborting, detected bomb nearby",
+                                            Duration = 3,
+                                        })
+                                        return
+                                    end
+                                    local hum2 = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
+                                    if hum2 and hum2.Health <= abortHealth then
+                                        game.StarterGui:SetCore("SendNotification", {
+                                            Title = "Player is hurt",
+                                            Text = "Aborted, player is hurt",
+                                        })
+                                        return
+                                    end
+                                    if meshPart.Transparency >= 0.97 then
+                                        continue
+                                    end
+                                    plrTween(meshPart.Position)
+                                    if meshPart.Parent and meshPart.Parent.Name == "Money" then
+                                        local args3 = { meshPart, "yQL", true }
+                                        robRemoteEvent:FireServer(unpack(args3))
+                                        task.wait(ProximityPromptTimeBet)
+                                        args3[3] = false
+                                        robRemoteEvent:FireServer(unpack(args3))
+                                        recordLootStat(true)
+                                    else
+                                        local args4 = { meshPart, "Vqe", true }
+                                        robRemoteEvent:FireServer(unpack(args4))
+                                        task.wait(ProximityPromptTimeBet)
+                                        args4[3] = false
+                                        robRemoteEvent:FireServer(unpack(args4))
+                                        recordLootStat(false)
+                                    end
+                                    task.wait(0.1)
                                 end
-                                if checkForBomb() then
-                                    game.StarterGui:SetCore("SendNotification", {
-                                        Title = "Bomb Detection",
-                                        Text = "Aborting, detected bomb nearby",
-                                        Duration = 3,
-                                    })
-                                    return
-                                end
-                                local hum2 = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
-                                if hum2 and hum2.Health <= abortHealth then
-                                    game.StarterGui:SetCore("SendNotification", {
-                                        Title = "Player is hurt",
-                                        Text = "Aborted, player is hurt",
-                                    })
-                                    return
-                                end
-                                if meshPart.Transparency == 1 then
-                                    continue
-                                end
-                                plrTween(meshPart.Position)
-                                if meshPart.Parent and meshPart.Parent.Name == "Money" then
-                                    local args3 = { meshPart, "yQL", true }
-                                    robRemoteEvent:FireServer(unpack(args3))
-                                    task.wait(ProximityPromptTimeBet)
-                                    args3[3] = false
-                                    robRemoteEvent:FireServer(unpack(args3))
-                                    recordLootStat(true)
-                                else
-                                    local args4 = { meshPart, "Vqe", true }
-                                    robRemoteEvent:FireServer(unpack(args4))
-                                    task.wait(ProximityPromptTimeBet)
-                                    args4[3] = false
-                                    robRemoteEvent:FireServer(unpack(args4))
-                                    recordLootStat(false)
-                                end
-                                task.wait(0.1)
                             end
                         end
 
@@ -1884,7 +1972,7 @@ end
                             local HumanoidRootPart = Character:WaitForChild("HumanoidRootPart")
 
                             local Collected = {}
-                            local ProximityPromptTimeBet = 2.3
+                            local ProximityPromptTimeBet = 2.5
                             local Range = 30
                             local Robberies = {}
 
@@ -1963,7 +2051,7 @@ end
                                     Text = "Dealers not found.",
                                     Duration = 3,
                                 })
-                                tweenTo(Vector3.new(-1292.9005126953125, -423.63556671142578, 3685.330810546875))
+                                tweenTo(SERVER_HOP_SAFE_POSITION)
                                 task.wait(1)
                                 performServerHop()
                                 return
@@ -1986,7 +2074,7 @@ end
                                     Text = "No dealer found.",
                                     Duration = 3,
                                 })
-                                tweenTo(Vector3.new(-1292.9005126953125, -423.63556671142578, 3685.330810546875))
+                                tweenTo(SERVER_HOP_SAFE_POSITION)
                                 task.wait(1)
                                 performServerHop()
                                 return
@@ -2248,7 +2336,7 @@ end
                                     task.wait(0.5)
 
                                     ensurePlayerInVehicle()
-                                    tweenTo(Vector3.new(-1292.9005126953125, -423.63556671142578, 3685.330810546875))
+                                    tweenTo(SERVER_HOP_SAFE_POSITION)
                                     task.wait(1)
                                     performServerHop()
                                 else
@@ -2256,7 +2344,7 @@ end
                                         Title = "Jeweler Safe is not open",
                                         Text = "Going to server hop",
                                     })
-                                    tweenTo(Vector3.new(-1292.9005126953125, -423.63556671142578, 3685.330810546875))
+                                    tweenTo(SERVER_HOP_SAFE_POSITION)
                                     task.wait(1)
                                     performServerHop()
                                 end
@@ -2265,7 +2353,7 @@ end
                                     Title = "Mode: Club & Bank",
                                     Text = "Skipping Jeweler → Server Hop",
                                 })
-                                tweenTo(Vector3.new(-1292.9005126953125, -423.63556671142578, 3685.330810546875))
+                                tweenTo(SERVER_HOP_SAFE_POSITION)
                                 task.wait(1)
                                 performServerHop()
                             end
