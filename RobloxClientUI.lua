@@ -721,12 +721,12 @@ function OrionLib:MakeWindow(WindowConfig)
 	if WindowConfig.IntroEnabled == nil then
 		WindowConfig.IntroEnabled = true
 	end
-	WindowConfig.IntroText = WindowConfig.IntroText or "Orion Library"
+	WindowConfig.IntroText = WindowConfig.IntroText or "MoonLibrary"
 	WindowConfig.CloseCallback = WindowConfig.CloseCallback or function() end
 	WindowConfig.ShowIcon = WindowConfig.ShowIcon or false
 	WindowConfig.Icon = WindowConfig.Icon or "layout-dashboard"
 	WindowConfig.IntroIcon = WindowConfig.IntroIcon or "layout-dashboard"
-	WindowConfig.BrandName = WindowConfig.BrandName or "Lyphix"
+	WindowConfig.BrandName = WindowConfig.BrandName or "MoonHub"
 	WindowConfig.BrandTag = WindowConfig.BrandTag or ""
 	OrionLib.Folder = WindowConfig.ConfigFolder
 	OrionLib.SaveCfg = WindowConfig.SaveConfig
