@@ -47,10 +47,16 @@ local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
 
 local webhookStats = {
-    bombsPurchased = 0,
-    safesRobbed = 0,
-    alreadyRobbedIgnored = 0,
-    currentBalance = "0"
+	bombsPurchased = 0,
+	safesRobbed = 0,
+	alreadyRobbedIgnored = 0,
+	currentBalance = "0",
+	currentGold = "—",
+}
+
+-- Kumulierte Stats + Hop-Zähler über Teleports (Executor-workspace JSON)
+local sessionMeta = {
+	hopIndex = 0,
 }
 
 local CoreGui = game:GetService("CoreGui")
@@ -268,6 +274,78 @@ end
 
 loadWebhookFromFiles()
 
+local function loadSessionStatsFromDisk()
+	if not (isfile and readfile) then
+		return
+	end
+	for _, path in ipairs({
+		CONFIG_AUTOROB,
+		CONFIG_AUTOROB_LEGACY,
+	}) do
+		if isfile(path) then
+			local ok, data = pcall(function()
+				return HttpService:JSONDecode(readfile(path))
+			end)
+			if ok and type(data) == "table" and data.sessionStats then
+				local s = data.sessionStats
+				webhookStats.bombsPurchased = tonumber(s.bombsPurchased) or webhookStats.bombsPurchased
+				webhookStats.safesRobbed = tonumber(s.safesRobbed) or webhookStats.safesRobbed
+				webhookStats.alreadyRobbedIgnored = tonumber(s.alreadyRobbedIgnored) or webhookStats.alreadyRobbedIgnored
+				sessionMeta.hopIndex = tonumber(s.hopIndex) or sessionMeta.hopIndex
+				break
+			end
+		end
+	end
+end
+
+loadSessionStatsFromDisk()
+
+local function persistSessionStats()
+	if not (writefile and readfile and isfile) then
+		return
+	end
+	local path = CONFIG_AUTOROB
+	local data = {}
+	if isfile(path) then
+		local ok, d = pcall(function()
+			return HttpService:JSONDecode(readfile(path))
+		end)
+		if ok and type(d) == "table" then
+			data = d
+		end
+	elseif isfile(CONFIG_AUTOROB_LEGACY) then
+		local ok, d = pcall(function()
+			return HttpService:JSONDecode(readfile(CONFIG_AUTOROB_LEGACY))
+		end)
+		if ok and type(d) == "table" then
+			data = d
+		end
+	end
+	data.sessionStats = {
+		bombsPurchased = webhookStats.bombsPurchased,
+		safesRobbed = webhookStats.safesRobbed,
+		alreadyRobbedIgnored = webhookStats.alreadyRobbedIgnored,
+		hopIndex = sessionMeta.hopIndex,
+	}
+	pcall(function()
+		writefile(path, HttpService:JSONEncode(data))
+	end)
+end
+
+local function recordLootStat(isMoneyLoot)
+	if isMoneyLoot then
+		webhookStats.safesRobbed = webhookStats.safesRobbed + 1
+	else
+		webhookStats.alreadyRobbedIgnored = webhookStats.alreadyRobbedIgnored + 1
+	end
+	persistSessionStats()
+end
+
+local function recordBombPurchase()
+	webhookStats.bombsPurchased = webhookStats.bombsPurchased + 1
+	persistSessionStats()
+end
+
 local function loadServerHistory()
     if isfile and isfile(SERVER_HISTORY_FILE) then
         local success, data = pcall(function()
@@ -368,25 +446,109 @@ local function findNewServer()
     return nil
 end
 
-local function sendEndReport()
+local function snapshotBalancesFromGui()
 	local p = game.Players.LocalPlayer
-	if p then
-		local playerGui = p:FindFirstChild("PlayerGui")
-		if playerGui then
-			for _, e in pairs(playerGui:GetDescendants()) do
-				if (e:IsA("TextLabel") or e:IsA("TextButton") or e:IsA("TextBox")) and e.Text then
-					if string.find(e.Text, "€") then
-						local amount = string.match(e.Text, "([%d%.]+[kKmM]?)%s*€")
-						if amount then
-							webhookStats.currentBalance = amount
-							break
-						end
+	if not p then
+		return
+	end
+	local pg = p:FindFirstChild("PlayerGui")
+	if not pg then
+		return
+	end
+	local bestCashNum = -1
+	local bestCashStr = tostring(webhookStats.currentBalance or "0")
+	local bestGoldNum = -1
+	local bestGoldStr = webhookStats.currentGold or "—"
+
+	local function scoreToken(s)
+		if not s or s == "" then
+			return -1
+		end
+		s = tostring(s)
+		local lower = string.lower(s)
+		local mult = 1
+		if string.find(lower, "k", 1, true) then
+			mult = 1000
+		end
+		if string.find(lower, "m", 1, true) then
+			mult = 1000000
+		end
+		local base = tonumber(string.match(s, "([%d%.]+)"))
+		if not base then
+			return -1
+		end
+		return math.floor(base * mult + 0.5)
+	end
+
+	for _, e in pairs(pg:GetDescendants()) do
+		if (e:IsA("TextLabel") or e:IsA("TextButton") or e:IsA("TextBox")) and e.Text and e.Text ~= "" then
+			local t = e.Text
+			if string.find(t, "€", 1, true) then
+				local amount = string.match(t, "([%d%.]+[kKmM]?)%s*€")
+				if amount then
+					local sc = scoreToken(amount)
+					if sc > bestCashNum then
+						bestCashNum = sc
+						bestCashStr = amount
 					end
+				end
+			end
+			local goldAmt = string.match(t, "([%d%.]+[kKmM]?)%s*[Gg]old")
+				or string.match(t, "[Gg]old[%s:%-_]*([%d%.]+[kKmM]?)")
+			if goldAmt then
+				local sg = scoreToken(goldAmt)
+				if sg > bestGoldNum then
+					bestGoldNum = sg
+					bestGoldStr = goldAmt
 				end
 			end
 		end
 	end
 
+	if bestCashNum >= 0 then
+		webhookStats.currentBalance = bestCashStr
+	end
+	if bestGoldNum >= 0 then
+		webhookStats.currentGold = bestGoldStr .. " Gold"
+	else
+		webhookStats.currentGold = "—"
+	end
+end
+
+local function getPoliceNearbyInfo()
+	local pl = player
+	local char = pl and pl.Character
+	local hrp = char and char:FindFirstChild("HumanoidRootPart")
+	if not hrp then
+		return false, nil
+	end
+	local nearest = nil
+	local nearby = false
+	for _, other in ipairs(game:GetService("Players"):GetPlayers()) do
+		if other ~= pl and other.Team and other.Team.Name == "Police" then
+			local oc = other.Character
+			local ohrp = oc and oc:FindFirstChild("HumanoidRootPart")
+			if ohrp then
+				local d = (ohrp.Position - hrp.Position).Magnitude
+				if d <= 150 then
+					nearby = true
+					if not nearest or d < nearest then
+						nearest = d
+					end
+				end
+			end
+		end
+	end
+	return nearby, nearest
+end
+
+-- reason: "server_hop" | "manual" | "test" — Polizei nur bei Hop zuverlässig sinnvoll
+local function sendSessionReport(info)
+	info = info or {}
+	local reason = info.reason or "manual"
+	snapshotBalancesFromGui()
+
+	local p = game.Players.LocalPlayer
 	local url = trimStr(webhookUrl)
 	if url == "" then
 		return false
@@ -399,6 +561,13 @@ local function sendEndReport()
 	local playersSvc = game:GetService("Players")
 	local playing = #playersSvc:GetPlayers()
 
+	local policeNearby = info.policeNearby
+	local policeDist = info.policeDistance
+	if policeNearby == nil and reason == "server_hop" then
+		policeNearby, policeDist = getPoliceNearbyInfo()
+	end
+	policeNearby = policeNearby and true or false
+
 	local headshot = string.format(
 		"https://www.roblox.com/headshot-thumbnail/image?userId=%d&width=180&height=180&format=png",
 		userId
@@ -406,8 +575,41 @@ local function sendEndReport()
 	local profileUrl = string.format("https://www.roblox.com/users/%d/profile", userId)
 	local gameUrl = string.format("https://www.roblox.com/games/%d", placeId)
 
-	-- Farbe passend zum Menü-Akzent (ca. RGB 138, 95, 255)
-	local embedColor = 9068543
+	local embedColor
+	local titlePrefix
+	if policeNearby then
+		embedColor = 16711680
+		titlePrefix = "🚨 POLIZEI NAH · "
+	elseif reason == "server_hop" then
+		embedColor = 15158332
+		titlePrefix = "🔻 Server Hop · "
+	elseif reason == "test" then
+		embedColor = 11041289
+		titlePrefix = "🧪 Webhook-Test · "
+	else
+		embedColor = 12632918
+		titlePrefix = "📣 Manuell · "
+	end
+
+	local reasonLine
+	if reason == "server_hop" then
+		reasonLine = "Auslöser: **Server-Wechsel** (Teleport) — Werte zum **Leave** aus der UI."
+	elseif reason == "test" then
+		reasonLine = "Auslöser: **Webhook-Test** — Live-Snapshot aus der UI."
+	else
+		reasonLine = "Auslöser: **Manueller Sessionbericht**."
+	end
+
+	local policeLine
+	if policeNearby then
+		policeLine = string.format("**Status:** `GEFÄHRLICH` — Polizei innerhalb **150 m**.\n**Distanz (nächster):** `%.1f m`", policeDist or 0)
+	else
+		policeLine = "**Status:** `OK` — keine Polizei im **150 m**-Radius (oder nicht ermittelbar)."
+	end
+
+	local hopNo = tonumber(sessionMeta.hopIndex) or 0
+	local leaveCash = tostring(webhookStats.currentBalance or "0")
+	local leaveGold = tostring(webhookStats.currentGold or "—")
 
 	local payload = {
 		username = "Lyphix · Emergency Hamburg",
@@ -415,36 +617,50 @@ local function sendEndReport()
 		embeds = {
 			{
 				author = {
-					name = "Lyphix · Emergency Hamburg",
+					name = "Lyphix · Emergency Hamburg · AutoRob",
 					url = gameUrl,
 					icon_url = headshot,
 				},
-				title = "AutoRob · Sitzungsbericht",
+				title = titlePrefix .. "Session-Report (#" .. tostring(hopNo) .. ")",
 				url = gameUrl,
 				description = string.format(
-					"Neuer Bericht von **%s** — Statistik zum Zeitpunkt des Events (Teleport / Server-Wechsel / Ende).",
-					playerName
+					"**%s**\n%s\n\n⏱ **%s** · Hop **`#%d`** · Stats werden in `LyphixEmergencyHamburg_autorob.json` mitgeschrieben (über Teleports).",
+					playerName,
+					reasonLine,
+					os.date("!%H:%M:%S UTC"),
+					hopNo
 				),
 				color = embedColor,
-				thumbnail = {
-					url = headshot,
-				},
+				thumbnail = { url = headshot },
 				fields = {
 					{
-						name = "Statistik",
+						name = "💶 Leave — Bargeld & Gold (UI)",
 						value = string.format(
-							"**Bomben gekauft:** `%d`\n**Safes ausgeraubt:** `%d`\n**Bereits geleert (ignoriert):** `%d`\n**Kontostand (UI):** `%s €`",
-							webhookStats.bombsPurchased,
-							webhookStats.safesRobbed,
-							webhookStats.alreadyRobbedIgnored,
-							tostring(webhookStats.currentBalance)
+							"**Bargeld (€):** `%s €`\n**Gold:** `%s`",
+							leaveCash,
+							leaveGold
 						),
 						inline = false,
 					},
 					{
-						name = "Spieler",
+						name = "📊 Session — kumuliert (gespeichert)",
 						value = string.format(
-							"**Name:** [%s](%s)\n**UserId:** `%d`",
+							"• Bomben gekauft: **`%d`**\n• Safes / Money-Mesh: **`%d`**\n• Bereits leer / ignoriert: **`%d`**",
+							webhookStats.bombsPurchased,
+							webhookStats.safesRobbed,
+							webhookStats.alreadyRobbedIgnored
+						),
+						inline = true,
+					},
+					{
+						name = "🚔 Polizei",
+						value = policeLine,
+						inline = true,
+					},
+					{
+						name = "👤 Spieler",
+						value = string.format(
+							"[%s](%s)\n`UserId %d`",
 							playerName,
 							profileUrl,
 							userId
@@ -452,9 +668,9 @@ local function sendEndReport()
 						inline = true,
 					},
 					{
-						name = "Server",
+						name = "🌐 Server",
 						value = string.format(
-							"**PlaceId:** `%d`\n**JobId:** `%s`\n**Spieler online:** `%d`\n**Spiel:** Emergency Hamburg",
+							"**PlaceId:** `%d`\n**JobId:** `%s`\n**Online:** `%d`",
 							placeId,
 							jobId,
 							playing
@@ -462,9 +678,7 @@ local function sendEndReport()
 						inline = true,
 					},
 				},
-				footer = {
-					text = "Lyphix · Emergency Hamburg · AutoRob",
-				},
+				footer = { text = "Lyphix · Emergency Hamburg · kumulierter AutoRob" },
 				timestamp = os.date("!%Y-%m-%dT%H:%M:%SZ"),
 			},
 		},
@@ -478,54 +692,60 @@ local function sendEndReport()
 		return false
 	end
 
-	local ok, response = pcall(function()
-		return requestFunc({
-			Url = url,
-			Method = "POST",
-			Headers = { ["Content-Type"] = "application/json" },
-			Body = encoded,
-		})
-	end)
-
-	if not ok then
-		warn("[Webhook] Request fehlgeschlagen: " .. tostring(response))
-		return false
+	local lastErr
+	for attempt = 1, 3 do
+		local ok, response = pcall(function()
+			return requestFunc({
+				Url = url,
+				Method = "POST",
+				Headers = { ["Content-Type"] = "application/json" },
+				Body = encoded,
+			})
+		end)
+		if not ok then
+			lastErr = tostring(response)
+		else
+			local status = tonumber(response and (response.StatusCode or response.statusCode or response.Status))
+			if not status or (status >= 200 and status < 300) then
+				return true
+			end
+			if status == 429 then
+				lastErr = "HTTP 429 Rate limit"
+				task.wait(1.4 * attempt)
+			else
+				lastErr = tostring(status) .. (response and response.Body and (": " .. tostring(response.Body):sub(1, 180)) or "")
+				break
+			end
+		end
+		task.wait(0.65 * attempt)
 	end
 
-	local status = tonumber(response and (response.StatusCode or response.statusCode or response.Status))
-	if status and (status < 200 or status >= 300) then
-		warn("[Webhook] HTTP " .. tostring(status) .. (response.Body and (": " .. tostring(response.Body):sub(1, 200)) or ""))
-		return false
-	end
-
-	return true
+	warn("[Webhook] Senden nach Versuchen fehlgeschlagen: " .. tostring(lastErr))
+	return false
 end
 
 local isServerHopping = false
 
 local function performServerHop()
-    if isServerHopping then return end
-    isServerHopping = true
-    
-    print("[ServerHop] Starting server hop...")
+	if isServerHopping then
+		return
+	end
+	isServerHopping = true
 
-    sendEndReport()
+	print("[ServerHop] Starting server hop...")
 
-    local policeNearby = false
+	local policeNearby, policeDist = getPoliceNearbyInfo()
+	snapshotBalancesFromGui()
+	sessionMeta.hopIndex = (tonumber(sessionMeta.hopIndex) or 0) + 1
+	persistSessionStats()
 
-    if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
-        for _, plr in ipairs(game:GetService("Players"):GetPlayers()) do
-            if plr ~= player and plr.Team and plr.Team.Name == "Police" and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
-                local dist = (plr.Character.HumanoidRootPart.Position - player.Character.HumanoidRootPart.Position).Magnitude
-                if dist <= 150 then
-                    policeNearby = true
-                    break
-                end
-            end
-        end
-    end
+	sendSessionReport({
+		reason = "server_hop",
+		policeNearby = policeNearby,
+		policeDistance = policeDist,
+	})
 
-    addCurrentServerToHistory()
+	addCurrentServerToHistory()
 
     local payload = lyphixTeleportAutoExecPayload()
 
@@ -895,6 +1115,13 @@ task.spawn(function()
                                     if config.webhookUrl ~= nil then
                                         webhookUrl = trimStr(config.webhookUrl)
                                     end
+                                    if config.sessionStats then
+                                        local s = config.sessionStats
+                                        webhookStats.bombsPurchased = tonumber(s.bombsPurchased) or webhookStats.bombsPurchased
+                                        webhookStats.safesRobbed = tonumber(s.safesRobbed) or webhookStats.safesRobbed
+                                        webhookStats.alreadyRobbedIgnored = tonumber(s.alreadyRobbedIgnored) or webhookStats.alreadyRobbedIgnored
+                                        sessionMeta.hopIndex = tonumber(s.hopIndex) or sessionMeta.hopIndex
+                                    end
                                 end
                             end
                         end
@@ -912,7 +1139,13 @@ task.spawn(function()
                                 invisibleEnabled = invisibleEnabled,
                                 autoRejoin = autoRejoin,
                                 webhookUrl = trimStr(webhookUrl),
-                                robMode = robMode
+                                robMode = robMode,
+                                sessionStats = {
+                                    bombsPurchased = webhookStats.bombsPurchased,
+                                    safesRobbed = webhookStats.safesRobbed,
+                                    alreadyRobbedIgnored = webhookStats.alreadyRobbedIgnored,
+                                    hopIndex = sessionMeta.hopIndex,
+                                },
                             }
                             local json = game:GetService("HttpService"):JSONEncode(config)
                             if writefile then
@@ -942,12 +1175,33 @@ task.spawn(function()
                         })
 
                         WebhookTab:AddButton({
+                            Name = "Sessionbericht senden",
+                            Callback = function()
+                                snapshotBalancesFromGui()
+                                persistSessionStats()
+                                local success = sendSessionReport({ reason = "manual" })
+                                if success then
+                                    OrionLib:MakeNotification({
+                                        Name = "Webhook",
+                                        Content = "Sessionbericht gesendet.",
+                                        Image = "rbxassetid://4483345998",
+                                        Time = 3
+                                    })
+                                else
+                                    OrionLib:MakeNotification({
+                                        Name = "Fehler",
+                                        Content = "Webhook konnte nicht gesendet werden (URL prüfen).",
+                                        Image = "rbxassetid://4483345998",
+                                        Time = 4
+                                    })
+                                end
+                            end
+                        })
+
+                        WebhookTab:AddButton({
                             Name = "Test Webhook",
                             Callback = function()
-                                local oldBalance = webhookStats.currentBalance
-                                webhookStats.currentBalance = "Test"
-                                local success = sendEndReport()
-                                webhookStats.currentBalance = oldBalance
+                                local success = sendSessionReport({ reason = "test" })
                                 
                                 if success then
                                     OrionLib:MakeNotification({
@@ -968,10 +1222,12 @@ task.spawn(function()
                         })
 
                         WebhookTab:AddParagraph("Stats", string.format(
-                            "Bombs: %d\nSafes: %d\nIgnored: %d",
+                            "Bomben: %d\nSafes: %d\nIgnoriert: %d\nBargeld (UI): %s €\nGold (UI): %s",
                             webhookStats.bombsPurchased,
                             webhookStats.safesRobbed,
-                            webhookStats.alreadyRobbedIgnored
+                            webhookStats.alreadyRobbedIgnored,
+                            tostring(webhookStats.currentBalance),
+                            tostring(webhookStats.currentGold)
                         ))
 
                         AutoRobTab:AddToggle({
@@ -1558,14 +1814,14 @@ end
                                     task.wait(ProximityPromptTimeBet)
                                     args[3] = false
                                     robRemoteEvent:FireServer(unpack(args))
-                                    webhookStats.safesRobbed = webhookStats.safesRobbed + 1
+                                    recordLootStat(true)
                                 else
                                     local args = {meshPart, "Vqe", true}
                                     robRemoteEvent:FireServer(unpack(args))
                                     task.wait(ProximityPromptTimeBet)
                                     args[3] = false
                                     robRemoteEvent:FireServer(unpack(args))
-                                    webhookStats.alreadyRobbedIgnored = webhookStats.alreadyRobbedIgnored + 1
+                                    recordLootStat(false)
                                 end
                             end
                         end
@@ -1622,7 +1878,7 @@ end
                                     task.wait(ProximityPromptTimeBet)
                                     args3[3] = false
                                     robRemoteEvent:FireServer(unpack(args3))
-                                    webhookStats.safesRobbed = webhookStats.safesRobbed + 1
+                                    recordLootStat(true)
                                 else
                                     local args4 = {
                                         [1] = meshPart,
@@ -1633,7 +1889,7 @@ end
                                     task.wait(ProximityPromptTimeBet)
                                     args4[3] = false
                                     robRemoteEvent:FireServer(unpack(args4))
-                                    webhookStats.alreadyRobbedIgnored = webhookStats.alreadyRobbedIgnored + 1
+                                    recordLootStat(false)
                                 end
 
                                 task.wait(0.1)
@@ -1678,16 +1934,13 @@ end
                                         if HumanoidRootPart and not Collected[m] and (m.Position - HumanoidRootPart.Position).Magnitude <= Range then
                                             Collected[m] = true
                                             task.spawn(function()
-                                                local a
-                                                if m.Parent and m.Parent.Name == "Money" then
-                                                    a = {m, "yQL", true}
-                                                else
-                                                    a = {m, "Vqe", true}
-                                                end
+                                                local isMoneyLoot = m.Parent and m.Parent.Name == "Money"
+                                                local a = isMoneyLoot and { m, "yQL", true } or { m, "Vqe", true }
                                                 robRemoteEvent:FireServer(unpack(a))
                                                 task.wait(ProximityPromptTimeBet)
                                                 a[3] = false
                                                 robRemoteEvent:FireServer(unpack(a))
+                                                recordLootStat(isMoneyLoot)
                                                 if m and m.Parent and m.Transparency == 0 then
                                                     Collected[m] = nil
                                                 end
@@ -1820,6 +2073,7 @@ end
                                     task.wait(0.5)
                                     local args = {[1] = "Bomb", [2] = "Dealer"}
                                     buyRemoteEvent:FireServer(unpack(args))
+                                    recordBombPurchase()
                                     task.wait(0.5)
                                 end
 
@@ -1898,6 +2152,7 @@ end
                                     task.wait(0.5)
                                     local args = { [1] = "Bomb", [2] = "Dealer" }
                                     buyRemoteEvent:FireServer(unpack(args))
+                                    recordBombPurchase()
                                     task.wait(0.5)
                                 end
 
@@ -1966,6 +2221,7 @@ end
                                         task.wait(0.5)
                                         local args = {[1] = "Bomb", [2] = "Dealer"}
                                         buyRemoteEvent:FireServer(unpack(args))
+                                        recordBombPurchase()
                                         task.wait(0.5)
                                     end
 
@@ -2060,6 +2316,7 @@ end
                                 task.wait(.5)
                                 local args = { [1] = "Bomb", [2] = "Dealer" }
                                 buyRemoteEvent:FireServer(unpack(args))
+                                recordBombPurchase()
                                 task.wait(0.5)
                                 tweenTo(con1Planks.Position)
                                 tweenTo(con1Planks.Position)
@@ -2115,6 +2372,7 @@ end
                                 task.wait(.5)
                                 local args = { [1] = "Bomb", [2] = "Dealer" }
                                 buyRemoteEvent:FireServer(unpack(args))
+                                recordBombPurchase()
                                 task.wait(0.5)
                                 tweenTo(con2Planks.Position)
                                 task.wait(0.5)
