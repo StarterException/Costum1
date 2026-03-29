@@ -569,10 +569,27 @@ end
 
 local isServerHopping = false
 
+-- Auto-Rob (Bank/Club): Third-Person-Kamera mit klarem Lebenszyklus — kein verwaister Heartbeat-Loop.
+local robBankCameraLockConn = nil
+local robBankCameraSmoothedCF = nil
+
+local function stopRobBankCameraLock()
+	if robBankCameraLockConn then
+		robBankCameraLockConn:Disconnect()
+		robBankCameraLockConn = nil
+	end
+	robBankCameraSmoothedCF = nil
+	local cam = workspace.CurrentCamera
+	if cam then
+		cam.CameraType = Enum.CameraType.Custom
+	end
+end
+
 local function performServerHop()
 	if isServerHopping then
 		return
 	end
+	stopRobBankCameraLock()
 	isServerHopping = true
 
 	pcall(function()
@@ -1771,7 +1788,8 @@ end
                                 
                                 if policeNearby and not isAborting then
                                     isAborting = true
-                                    
+                                    stopRobBankCameraLock()
+
                                     game.StarterGui:SetCore("SendNotification", {
                                         Title = "Police Nearby",
                                         Text = string.format("Police nearby (%d studs) - Aborting %s robbery!", math.floor(distance), robberyName),
@@ -2183,11 +2201,52 @@ end
                             local player = game.Players.LocalPlayer
                             local character = player.Character or player.CharacterAdded:Wait()
 
-                            -- Kein dauerhaftes Kamera-Lock (Heartbeat): das blockiert Fahrzeug-/Tween-Kamera und bricht Bewegung
-                            local cam = workspace.CurrentCamera
-                            if cam then
-                                cam.CameraType = Enum.CameraType.Custom
-                            end
+                            stopRobBankCameraLock()
+                            robBankCameraLockConn = RunService.RenderStepped:Connect(function(dt)
+                                if not player then
+                                    return
+                                end
+                                local char = player.Character
+                                if not char or not char.Parent then
+                                    return
+                                end
+                                local hum = char:FindFirstChildWhichIsA("Humanoid")
+                                if not hum then
+                                    return
+                                end
+                                local focusPart = nil
+                                local seat = hum.SeatPart
+                                if seat and seat:IsA("VehicleSeat") then
+                                    local veh = seat:FindFirstAncestorWhichIsA("Model")
+                                    if veh and veh.PrimaryPart then
+                                        focusPart = veh.PrimaryPart
+                                    else
+                                        focusPart = seat
+                                    end
+                                else
+                                    focusPart = char:FindFirstChild("HumanoidRootPart")
+                                end
+                                if not focusPart or not focusPart:IsA("BasePart") then
+                                    return
+                                end
+                                local cam = workspace.CurrentCamera
+                                if not cam then
+                                    return
+                                end
+                                local pos = focusPart.Position
+                                local back = -focusPart.CFrame.LookVector
+                                local camPos = pos + back * 7 + Vector3.new(0, 3, 0)
+                                local lookAt = pos + Vector3.new(0, 1.85, 0)
+                                local targetCF = CFrame.new(camPos, lookAt)
+                                cam.CameraType = Enum.CameraType.Scriptable
+                                local alpha = math.clamp(15 * dt, 0, 1)
+                                if not robBankCameraSmoothedCF then
+                                    robBankCameraSmoothedCF = targetCF
+                                else
+                                    robBankCameraSmoothedCF = robBankCameraSmoothedCF:Lerp(targetCF, alpha)
+                                end
+                                cam.CFrame = robBankCameraSmoothedCF
+                            end)
 
                             local clubPos = Vector3.new(-1739.5330810546875, 11, 3052.31103515625)
                             local clubStand = Vector3.new(-1744.177001953125, 11.125, 3012.20263671875)
