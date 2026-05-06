@@ -1736,7 +1736,12 @@ function OrionLib:MakeWindow(WindowConfig)
 	end
 
 	if OrionLib.AllowDrag ~= false then
-		AddDraggingFunctionality(DragPoint, MainWindow)
+		local dp = MainWindow:FindFirstChild("TopBar") or DragPoint
+		pcall(function()
+			dp.Active = true
+			dp.Selectable = true
+		end)
+		AddDraggingFunctionality(dp, MainWindow)
 	end
 
 	local TTextCol = OrionLib.Themes[OrionLib.SelectedTheme].Text
