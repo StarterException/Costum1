@@ -116,6 +116,50 @@ local OrionLib = {
 			Accent = Color3.fromRGB(251, 146, 60),
 			Accent2 = Color3.fromRGB(253, 224, 71)
 		},
+		Ocean = {
+			DisplayName = "Ocean",
+			Main = Color3.fromRGB(6, 10, 16),
+			Second = Color3.fromRGB(12, 18, 28),
+			Stroke = Color3.fromRGB(34, 56, 88),
+			Divider = Color3.fromRGB(20, 34, 54),
+			Text = Color3.fromRGB(240, 250, 255),
+			TextDark = Color3.fromRGB(140, 175, 205),
+			Accent = Color3.fromRGB(59, 130, 246),
+			Accent2 = Color3.fromRGB(34, 211, 238)
+		},
+		Lime = {
+			DisplayName = "Lime",
+			Main = Color3.fromRGB(8, 12, 8),
+			Second = Color3.fromRGB(16, 22, 16),
+			Stroke = Color3.fromRGB(44, 70, 48),
+			Divider = Color3.fromRGB(26, 44, 30),
+			Text = Color3.fromRGB(245, 255, 246),
+			TextDark = Color3.fromRGB(150, 185, 155),
+			Accent = Color3.fromRGB(132, 204, 22),
+			Accent2 = Color3.fromRGB(34, 197, 94)
+		},
+		Indigo = {
+			DisplayName = "Indigo",
+			Main = Color3.fromRGB(8, 8, 16),
+			Second = Color3.fromRGB(16, 16, 30),
+			Stroke = Color3.fromRGB(48, 48, 92),
+			Divider = Color3.fromRGB(28, 28, 58),
+			Text = Color3.fromRGB(248, 248, 255),
+			TextDark = Color3.fromRGB(165, 170, 210),
+			Accent = Color3.fromRGB(99, 102, 241),
+			Accent2 = Color3.fromRGB(167, 139, 250)
+		},
+		Amber = {
+			DisplayName = "Amber",
+			Main = Color3.fromRGB(14, 10, 6),
+			Second = Color3.fromRGB(24, 18, 10),
+			Stroke = Color3.fromRGB(82, 62, 32),
+			Divider = Color3.fromRGB(48, 40, 22),
+			Text = Color3.fromRGB(255, 252, 240),
+			TextDark = Color3.fromRGB(205, 180, 140),
+			Accent = Color3.fromRGB(245, 158, 11),
+			Accent2 = Color3.fromRGB(250, 204, 21)
+		},
 		Aurum = {
 			DisplayName = "Aurum",
 			PremiumOnly = true,
@@ -171,7 +215,7 @@ local OrionLib = {
 	},
 	ThemeOrder = {
 		"Default", "Obsidian", "Crimson", "Emerald", "Amethyst",
-		"Rose", "Slate", "Cyber", "Sunset",
+		"Rose", "Slate", "Cyber", "Sunset", "Ocean", "Lime", "Indigo", "Amber",
 		"Aurum", "RubyLux", "Nexus", "Nocturne"
 	},
 	SelectedTheme = "Default",
@@ -1120,6 +1164,10 @@ function OrionLib:MakeWindow(WindowConfig)
 		}), "Text"),
 		ThemeClick
 	}), "Second")
+	ThemePickerBtn.Visible = false
+	pcall(function()
+		ThemePickerBtn.Active = false
+	end)
 
 	local WindowTopBarLine = AddThemeObject(SetProps(MakeElement("Frame"), {
 		Size = UDim2.new(1, 0, 0, 1),
@@ -1191,7 +1239,6 @@ function OrionLib:MakeWindow(WindowConfig)
 					return tb
 				end)()
 			}), "Second"),
-			ThemePickerBtn,
 			AddThemeObject(SetChildren(SetProps(MakeElement("RoundFrame", Color3.fromRGB(255, 255, 255), 0, 18), {
 				Size = UDim2.new(0, 88, 0, 38),
 				Position = UDim2.new(1, -98, 0, 8),
@@ -1458,12 +1505,7 @@ function OrionLib:MakeWindow(WindowConfig)
 	rebuildThemeRows()
 
 	AddConnection(ThemeClick.MouseButton1Click, function()
-		ThemeDropdownOpen = not ThemeDropdownOpen
-		ThemeDropdown.Visible = ThemeDropdownOpen
-		if ThemeDropdownOpen then
-			rebuildThemeRows()
-			refreshThemeHint()
-		end
+		return
 	end)
 
 	table.insert(OrionLib._ThemeListeners, function()
@@ -2194,7 +2236,8 @@ function OrionLib:MakeWindow(WindowConfig)
 				local Button = {}
 
 				local Click = SetProps(MakeElement("Button"), {
-					Size = UDim2.new(1, 0, 1, 0)
+					Size = UDim2.new(1, 0, 1, 0),
+					AutoButtonColor = false
 				})
 
 				local buttonCaptionEl = AddThemeObject(SetProps(MakeElement("Label", ButtonConfig.Name, 15), {
@@ -2206,7 +2249,7 @@ function OrionLib:MakeWindow(WindowConfig)
 
 				local ButtonFrame = AddThemeObject(SetChildren(SetProps(MakeElement("RoundFrame", Color3.fromRGB(255, 255, 255), 0, 14), {
 					Size = UDim2.new(1, 0, 0, 38),
-					BackgroundTransparency = 0.62,
+					BackgroundTransparency = 0.72,
 					Parent = ItemParent
 				}), {
 					buttonCaptionEl,
@@ -2214,27 +2257,27 @@ function OrionLib:MakeWindow(WindowConfig)
 						Size = UDim2.new(0, 20, 0, 20),
 						Position = UDim2.new(1, -30, 0, 7),
 					}), "TextDark"),
-					AddThemeObject(MakeElement("Stroke"), "Stroke"),
+					AddThemeObject(SetProps(MakeElement("Stroke"), {Transparency = 0.86, Thickness = 1.05}), "Stroke"),
 					Click
 				}), "Second")
 
 				AddConnection(Click.MouseEnter, function()
-					TweenService:Create(ButtonFrame, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {BackgroundColor3 = Color3.fromRGB(OrionLib.Themes[OrionLib.SelectedTheme].Second.R * 255 + 3, OrionLib.Themes[OrionLib.SelectedTheme].Second.G * 255 + 3, OrionLib.Themes[OrionLib.SelectedTheme].Second.B * 255 + 3)}):Play()
+					TweenService:Create(ButtonFrame, TweenInfo.new(0.18, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {BackgroundTransparency = 0.60}):Play()
 				end)
 
 				AddConnection(Click.MouseLeave, function()
-					TweenService:Create(ButtonFrame, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {BackgroundColor3 = OrionLib.Themes[OrionLib.SelectedTheme].Second}):Play()
+					TweenService:Create(ButtonFrame, TweenInfo.new(0.22, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {BackgroundTransparency = 0.72}):Play()
 				end)
 
 				AddConnection(Click.MouseButton1Up, function()
-					TweenService:Create(ButtonFrame, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {BackgroundColor3 = Color3.fromRGB(OrionLib.Themes[OrionLib.SelectedTheme].Second.R * 255 + 3, OrionLib.Themes[OrionLib.SelectedTheme].Second.G * 255 + 3, OrionLib.Themes[OrionLib.SelectedTheme].Second.B * 255 + 3)}):Play()
+					TweenService:Create(ButtonFrame, TweenInfo.new(0.18, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {BackgroundTransparency = 0.60}):Play()
 					spawn(function()
 						ButtonConfig.Callback()
 					end)
 				end)
 
 				AddConnection(Click.MouseButton1Down, function()
-					TweenService:Create(ButtonFrame, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {BackgroundColor3 = Color3.fromRGB(OrionLib.Themes[OrionLib.SelectedTheme].Second.R * 255 + 6, OrionLib.Themes[OrionLib.SelectedTheme].Second.G * 255 + 6, OrionLib.Themes[OrionLib.SelectedTheme].Second.B * 255 + 6)}):Play()
+					TweenService:Create(ButtonFrame, TweenInfo.new(0.12, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {BackgroundTransparency = 0.52}):Play()
 				end)
 
 				function Button:Set(ButtonText)
@@ -2260,7 +2303,7 @@ function OrionLib:MakeWindow(WindowConfig)
 
 				local AccentBar = Create("Frame", {
 					Name = "AccentBar",
-					Size = UDim2.new(0, 4, 0.68, 0),
+					Size = UDim2.new(0, 3, 0.68, 0),
 					Position = UDim2.new(0, 14, 0.16, 0),
 					BackgroundColor3 = TOff,
 					BackgroundTransparency = 0.35,
@@ -2277,7 +2320,7 @@ function OrionLib:MakeWindow(WindowConfig)
 				}), "Main")
 
 				local SwitchTrack = SetChildren(SetProps(MakeElement("RoundFrame", TOff, 0, 16), {
-					Size = UDim2.new(0, 58, 0, 32),
+					Size = UDim2.new(0, 54, 0, 30),
 					Position = UDim2.new(1, -14, 0.5, 0),
 					AnchorPoint = Vector2.new(1, 0.5),
 					BackgroundTransparency = 0.22,
@@ -2286,7 +2329,7 @@ function OrionLib:MakeWindow(WindowConfig)
 					AddThemeObject(SetProps(MakeElement("Stroke"), {Name = "TrackStroke", Transparency = 0.78, Thickness = 1.1}), "Stroke"),
 					Create("Frame", {
 						Name = "Knob",
-						Size = UDim2.new(0, 26, 0, 26),
+						Size = UDim2.new(0, 24, 0, 24),
 						Position = UDim2.new(0, 3, 0.5, 0),
 						AnchorPoint = Vector2.new(0, 0.5),
 						BackgroundColor3 = Color3.fromRGB(255, 255, 255),
@@ -2300,8 +2343,8 @@ function OrionLib:MakeWindow(WindowConfig)
 				})
 
 				local ToggleFrame = AddThemeObject(SetChildren(SetProps(MakeElement("RoundFrame", Color3.fromRGB(255, 255, 255), 0, 18), {
-					Size = UDim2.new(1, 0, 0, 60),
-					BackgroundTransparency = 0.45,
+					Size = UDim2.new(1, 0, 0, 56),
+					BackgroundTransparency = 0.52,
 					Parent = ItemParent
 				}), {
 					AddThemeObject(SetProps(MakeElement("Stroke"), {Transparency = 0.88, Thickness = 1.08}), "Stroke"),
@@ -2342,7 +2385,7 @@ function OrionLib:MakeWindow(WindowConfig)
 					end
 					if knob then
 						TweenService:Create(knob, TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
-							Position = on and UDim2.new(0, 29, 0.5, 0) or UDim2.new(0, 3, 0.5, 0)
+							Position = on and UDim2.new(0, 27, 0.5, 0) or UDim2.new(0, 3, 0.5, 0)
 						}):Play()
 					end
 					ToggleConfig.Callback(Toggle.Value)
@@ -2351,10 +2394,10 @@ function OrionLib:MakeWindow(WindowConfig)
 				Toggle:Set(Toggle.Value)
 
 				AddConnection(Click.MouseEnter, function()
-					TweenService:Create(ToggleFrame, TweenInfo.new(0.2, Enum.EasingStyle.Quint), {BackgroundTransparency = 0.32}):Play()
+					TweenService:Create(ToggleFrame, TweenInfo.new(0.18, Enum.EasingStyle.Quint), {BackgroundTransparency = 0.44}):Play()
 				end)
 				AddConnection(Click.MouseLeave, function()
-					TweenService:Create(ToggleFrame, TweenInfo.new(0.2, Enum.EasingStyle.Quint), {BackgroundTransparency = 0.45}):Play()
+					TweenService:Create(ToggleFrame, TweenInfo.new(0.22, Enum.EasingStyle.Quint), {BackgroundTransparency = 0.52}):Play()
 				end)
 				AddConnection(Click.MouseButton1Up, function()
 					SaveCfg(game.GameId)
