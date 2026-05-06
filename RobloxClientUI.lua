@@ -16,6 +16,14 @@ local OrionLib = {
 	_PremiumKeyList = nil,
 	_PremiumPersistPath = nil,
 	PremiumUnlocked = false,
+	Typography = {
+		FontBody = Enum.Font.Gotham,
+		FontStrong = Enum.Font.GothamSemibold,
+		FontTitle = Enum.Font.GothamBold,
+		SizeBody = 14,
+		SizeSmall = 12,
+		SizeTitle = 17
+	},
 	Themes = {
 		Default = {
 			DisplayName = "Aurora",
@@ -782,8 +790,8 @@ CreateElement("Label", function(Text, TextSize, Transparency)
 		Text = Text or "",
 		TextColor3 = Color3.fromRGB(244, 246, 255),
 		TextTransparency = Transparency or 0,
-		TextSize = TextSize or 15,
-		Font = Enum.Font.GothamMedium,
+		TextSize = TextSize or (OrionLib.Typography and OrionLib.Typography.SizeBody) or 14,
+		Font = (OrionLib.Typography and OrionLib.Typography.FontBody) or Enum.Font.Gotham,
 		RichText = true,
 		BackgroundTransparency = 1,
 		TextXAlignment = Enum.TextXAlignment.Left
@@ -1034,7 +1042,7 @@ function OrionLib:MakeWindow(WindowConfig)
 			AddThemeObject(SetProps(MakeElement("Label", "Navigation", 12), {
 				Size = UDim2.new(1, -36, 1, 0),
 				Position = UDim2.new(0, 24, 0, 0),
-				Font = Enum.Font.GothamBold,
+				Font = OrionLib.Typography.FontStrong,
 				TextTransparency = 0.58,
 				TextSize = 11,
 				TextXAlignment = Enum.TextXAlignment.Left
@@ -1130,8 +1138,8 @@ function OrionLib:MakeWindow(WindowConfig)
 	local WindowName = AddThemeObject(SetProps(MakeElement("Label", WindowConfig.Name, 14), {
 		Size = UDim2.new(1, -190, 1, 0),
 		Position = UDim2.new(0, 28, 0, 0),
-		Font = Enum.Font.GothamBold,
-		TextSize = 18,
+		Font = OrionLib.Typography.FontTitle,
+		TextSize = OrionLib.Typography.SizeTitle,
 		TextTruncate = Enum.TextTruncate.AtEnd
 	}), "Text")
 
@@ -1926,39 +1934,39 @@ function OrionLib:MakeWindow(WindowConfig)
 		local TAccent = OrionLib.Themes[OrionLib.SelectedTheme].Accent
 		local TSecond = OrionLib.Themes[OrionLib.SelectedTheme].Second
 		local TabFrame = SetChildren(SetProps(MakeElement("Button"), {
-			Size = UDim2.new(1, 0, 0, 46),
+			Size = UDim2.new(1, 0, 0, 42),
 			Parent = TabHolder,
 			ZIndex = 2
 		}), {
 			AddThemeObject(SetChildren(SetProps(MakeElement("RoundFrame", Color3.fromRGB(255, 255, 255), 0, 16), {
-				Size = UDim2.new(1, -8, 1, -6),
-				Position = UDim2.new(0, 4, 0, 3),
+				Size = UDim2.new(1, -10, 1, -6),
+				Position = UDim2.new(0, 5, 0, 3),
 				Name = "TabBg",
 				ZIndex = 0,
-				BackgroundTransparency = 0.9
+				BackgroundTransparency = 0.94
 			}), {
 				Create("UIStroke", {
 					Name = "TabStroke",
 					Color = TAccent,
-					Thickness = 1.2,
+					Thickness = 1.05,
 					Transparency = 1,
 					LineJoinMode = Enum.LineJoinMode.Round
 				})
 			}), "Second"),
 			AddThemeObject(SetProps(MakeElement("Image", TabConfig.Icon), {
 				AnchorPoint = Vector2.new(0, 0.5),
-				Size = UDim2.new(0, 20, 0, 20),
+				Size = UDim2.new(0, 18, 0, 18),
 				Position = UDim2.new(0, 14, 0.5, 0),
-				ImageTransparency = 0.42,
+				ImageTransparency = 0.48,
 				Name = "Ico",
 				ZIndex = 2
 			}), "Text"),
 			AddThemeObject(SetProps(MakeElement("Label", TabConfig.Name, 14), {
 				Size = UDim2.new(1, -42, 1, 0),
 				Position = UDim2.new(0, 40, 0, 0),
-				Font = Enum.Font.GothamMedium,
-				TextTransparency = 0.38,
-				TextSize = 14,
+				Font = OrionLib.Typography.FontStrong,
+				TextTransparency = 0.48,
+				TextSize = 13,
 				Name = "Title",
 				ZIndex = 2
 			}), "Text")
@@ -1975,11 +1983,11 @@ function OrionLib:MakeWindow(WindowConfig)
 			if selected then
 				TweenService:Create(bg, TweenInfo.new(0.28, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
 					BackgroundColor3 = TAccent,
-					BackgroundTransparency = 0.72
+					BackgroundTransparency = 0.78
 				}):Play()
 				TweenService:Create(Tab.Ico, TweenInfo.new(0.28, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {ImageTransparency = 0.08, ImageColor3 = Color3.fromRGB(255, 255, 255)}):Play()
 				TweenService:Create(Tab.Title, TweenInfo.new(0.28, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {TextTransparency = 0}):Play()
-				Tab.Title.Font = Enum.Font.GothamBold
+				Tab.Title.Font = OrionLib.Typography.FontTitle
 				if stroke then
 					TweenService:Create(stroke, TweenInfo.new(0.28, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Transparency = 0.82}):Play()
 				end
@@ -1990,7 +1998,7 @@ function OrionLib:MakeWindow(WindowConfig)
 				}):Play()
 				TweenService:Create(Tab.Ico, TweenInfo.new(0.28, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {ImageTransparency = 0.45, ImageColor3 = OrionLib.Themes[OrionLib.SelectedTheme].Text}):Play()
 				TweenService:Create(Tab.Title, TweenInfo.new(0.28, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {TextTransparency = 0.4}):Play()
-				Tab.Title.Font = Enum.Font.GothamMedium
+				Tab.Title.Font = OrionLib.Typography.FontStrong
 				if stroke then
 					TweenService:Create(stroke, TweenInfo.new(0.28, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Transparency = 1}):Play()
 				end
