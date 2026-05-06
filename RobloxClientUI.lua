@@ -175,9 +175,24 @@ local OrionLib = {
 		"Aurum", "RubyLux", "Nexus", "Nocturne"
 	},
 	SelectedTheme = "Default",
+	Locked = true,
 	Folder = nil,
 	SaveCfg = false
 }
+
+local function pickRandomThemeKey()
+	local keys = {}
+	for _, key in ipairs(OrionLib.ThemeOrder or {}) do
+		local pal = OrionLib.Themes[key]
+		if pal and not pal.PremiumOnly then
+			table.insert(keys, key)
+		end
+	end
+	if #keys == 0 then
+		return "Default"
+	end
+	return keys[math.random(1, #keys)]
+end
 
 local Icons = {}
 local LUCIDE_FALLBACK = "rbxassetid://7734052925"
@@ -211,12 +226,33 @@ Orion.Name = "Orion"
 Orion.ResetOnSpawn = false
 Orion.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 Orion.DisplayOrder = 550
+pcall(function()
+	OrionLib.SelectedTheme = pickRandomThemeKey()
+end)
 if syn then
 	syn.protect_gui(Orion)
 	Orion.Parent = game.CoreGui
 else
 	Orion.Parent = gethui() or game.CoreGui
 end
+
+local UiScale = Instance.new("UIScale")
+UiScale.Scale = 1
+UiScale.Parent = Orion
+local function refreshScale()
+	local cam = workspace.CurrentCamera
+	if not cam then return end
+	local v = cam.ViewportSize
+	local base = 1920
+	local s = math.clamp(v.X / base, 0.82, 1)
+	UiScale.Scale = s
+end
+pcall(refreshScale)
+pcall(function()
+	RunService.RenderStepped:Connect(function()
+		refreshScale()
+	end)
+end)
 
 if gethui then
 	for _, Interface in ipairs(gethui():GetChildren()) do
@@ -309,6 +345,9 @@ task.spawn(function()
 end)
 
 local function AddDraggingFunctionality(DragPoint, Main)
+	if OrionLib.Locked then
+		return
+	end
 	local dragging = false
 	local dragUsesTouch = false
 	local activeTouchInput = nil
@@ -1188,7 +1227,7 @@ function OrionLib:MakeWindow(WindowConfig)
 	local ResizeGrip = AddThemeObject(SetProps(Create("ImageLabel", {
 		Parent = MainWindow,
 		Name = "ResizeGrip",
-		Active = true,
+	Active = false,
 		Selectable = false,
 		Size = UDim2.new(0, 40, 0, 40),
 		Position = UDim2.new(1, -2, 1, -2),
@@ -1197,11 +1236,14 @@ function OrionLib:MakeWindow(WindowConfig)
 		BorderSizePixel = 0,
 		Image = Lucide("grip-vertical"),
 		ScaleType = Enum.ScaleType.Fit,
-		ImageTransparency = 0.42,
+	ImageTransparency = 1,
 		ZIndex = 95,
 	}), {}), "TextDark")
 
 	AddConnection(ResizeGrip.InputBegan, function(input)
+	if OrionLib.Locked then
+		return
+	end
 		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
 			if Minimized then
 				return
@@ -1692,7 +1734,7 @@ function OrionLib:MakeWindow(WindowConfig)
 		end
 	end
 
-	AddDraggingFunctionality(DragPoint, MainWindow)
+	-- locked UI: no dragging
 
 	local TTextCol = OrionLib.Themes[OrionLib.SelectedTheme].Text
 	local TAcc2Col = OrionLib.Themes[OrionLib.SelectedTheme].Accent2
@@ -1925,18 +1967,18 @@ function OrionLib:MakeWindow(WindowConfig)
 			if selected then
 				TweenService:Create(bg, TweenInfo.new(0.28, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
 					BackgroundColor3 = TAccent,
-					BackgroundTransparency = 0.58
+					BackgroundTransparency = 0.72
 				}):Play()
-				TweenService:Create(Tab.Ico, TweenInfo.new(0.28, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {ImageTransparency = 0, ImageColor3 = Color3.fromRGB(255, 255, 255)}):Play()
+				TweenService:Create(Tab.Ico, TweenInfo.new(0.28, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {ImageTransparency = 0.08, ImageColor3 = Color3.fromRGB(255, 255, 255)}):Play()
 				TweenService:Create(Tab.Title, TweenInfo.new(0.28, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {TextTransparency = 0}):Play()
 				Tab.Title.Font = Enum.Font.GothamBold
 				if stroke then
-					TweenService:Create(stroke, TweenInfo.new(0.28, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Transparency = 0.72}):Play()
+					TweenService:Create(stroke, TweenInfo.new(0.28, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Transparency = 0.82}):Play()
 				end
 			else
 				TweenService:Create(bg, TweenInfo.new(0.28, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
 					BackgroundColor3 = TSecond,
-					BackgroundTransparency = 0.92
+					BackgroundTransparency = 0.95
 				}):Play()
 				TweenService:Create(Tab.Ico, TweenInfo.new(0.28, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {ImageTransparency = 0.45, ImageColor3 = OrionLib.Themes[OrionLib.SelectedTheme].Text}):Play()
 				TweenService:Create(Tab.Title, TweenInfo.new(0.28, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {TextTransparency = 0.4}):Play()
