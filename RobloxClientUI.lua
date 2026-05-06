@@ -1035,7 +1035,8 @@ function OrionLib:MakeWindow(WindowConfig)
 				Size = UDim2.new(1, -36, 1, 0),
 				Position = UDim2.new(0, 24, 0, 0),
 				Font = Enum.Font.GothamBold,
-				TextTransparency = 0.42,
+				TextTransparency = 0.58,
+				TextSize = 11,
 				TextXAlignment = Enum.TextXAlignment.Left
 			}), "TextDark")
 		}),
@@ -1078,39 +1079,57 @@ function OrionLib:MakeWindow(WindowConfig)
 				table.insert(rows, premBtn)
 			end
 			local brandTop = showPremiumKeyEntry and 46 or 0
-			table.insert(rows, AddThemeObject(SetProps(MakeElement("Frame"), {
-				Size = UDim2.new(1, -20, 0, 1),
-				Position = UDim2.new(0, 10, 0, brandTop),
-				BackgroundTransparency = 0.55,
-				Name = "FooterLine"
-			}), "Stroke"))
-			table.insert(rows, AddThemeObject(SetProps(MakeElement("Label", WindowConfig.BrandName, 14), {
-				Size = UDim2.new(1, -28, 0, 18),
-				Position = UDim2.new(0, 14, 0, brandTop + 10),
-				Font = Enum.Font.GothamBold,
-				TextSize = 15,
-				ClipsDescendants = true,
-				Name = "BrandTitle",
-				TextXAlignment = Enum.TextXAlignment.Left
-			}), "Text"))
-			table.insert(rows, AddThemeObject(SetProps(MakeElement("Label", WindowConfig.BrandTag, 11), {
-				Size = UDim2.new(1, -28, 0, 28),
-				Position = UDim2.new(0, 14, 0, brandTop + 28),
-				Font = Enum.Font.GothamMedium,
-				TextTransparency = 0.12,
-				TextWrapped = true,
-				Visible = WindowConfig.BrandTag ~= "",
-				Name = "BrandTag",
-				TextXAlignment = Enum.TextXAlignment.Left,
-				TextYAlignment = Enum.TextYAlignment.Top
-			}), "Accent"))
+			table.insert(rows, AddThemeObject(SetChildren(SetProps(MakeElement("RoundFrame", Color3.fromRGB(255, 255, 255), 0, 16), {
+				Size = UDim2.new(1, -20, 0, showPremiumKeyEntry and 50 or 54),
+				Position = UDim2.new(0, 10, 0, brandTop + 6),
+				BackgroundTransparency = 0.58,
+				Name = "BrandCard"
+			}), {
+				AddThemeObject(SetProps(MakeElement("Stroke"), {Transparency = 0.88, Thickness = 1.05}), "Stroke"),
+				Create("UIGradient", {
+					Rotation = 110,
+					Color = ColorSequence.new({
+						ColorSequenceKeypoint.new(0, OrionLib.Themes[OrionLib.SelectedTheme].Second:Lerp(OrionLib.Themes[OrionLib.SelectedTheme].Accent, 0.06)),
+						ColorSequenceKeypoint.new(1, OrionLib.Themes[OrionLib.SelectedTheme].Second)
+					})
+				}),
+				Create("Frame", {
+					Name = "BrandDot",
+					Size = UDim2.new(0, 8, 0, 8),
+					Position = UDim2.new(0, 14, 0, 14),
+					BackgroundColor3 = OrionLib.Themes[OrionLib.SelectedTheme].Accent,
+					BorderSizePixel = 0,
+					BackgroundTransparency = 0.02
+				}, {Create("UICorner", {CornerRadius = UDim.new(1, 0)})}),
+				AddThemeObject(SetProps(MakeElement("Label", WindowConfig.BrandName, 14), {
+					Size = UDim2.new(1, -46, 0, 18),
+					Position = UDim2.new(0, 28, 0, 10),
+					Font = Enum.Font.GothamBold,
+					TextSize = 15,
+					ClipsDescendants = true,
+					Name = "BrandTitle",
+					TextXAlignment = Enum.TextXAlignment.Left,
+					TextTransparency = 0.02
+				}), "Text"),
+				AddThemeObject(SetProps(MakeElement("Label", WindowConfig.BrandTag, 11), {
+					Size = UDim2.new(1, -46, 0, 22),
+					Position = UDim2.new(0, 28, 0, 28),
+					Font = Enum.Font.GothamMedium,
+					TextTransparency = 0.18,
+					TextWrapped = true,
+					Visible = WindowConfig.BrandTag ~= "",
+					Name = "BrandTag",
+					TextXAlignment = Enum.TextXAlignment.Left,
+					TextYAlignment = Enum.TextYAlignment.Top
+				}), "TextDark")
+			}), "Second"))
 			return rows
 		end)()),
 	}), "Second")
 
 	local WindowName = AddThemeObject(SetProps(MakeElement("Label", WindowConfig.Name, 14), {
-		Size = UDim2.new(1, -520, 2, 0),
-		Position = UDim2.new(0, 28, 0, -26),
+		Size = UDim2.new(1, -190, 1, 0),
+		Position = UDim2.new(0, 28, 0, 0),
 		Font = Enum.Font.GothamBold,
 		TextSize = 18,
 		TextTruncate = Enum.TextTruncate.AtEnd
@@ -1195,55 +1214,25 @@ function OrionLib:MakeWindow(WindowConfig)
 		SetChildren(SetProps(MakeElement("TFrame"), {
 			Size = UDim2.new(1, 0, 0, 54),
 			Name = "TopBar",
-			ZIndex = 2
+			ZIndex = 2,
+			BackgroundTransparency = 0.35
 		}), {
+			Create("UIGradient", {
+				Rotation = 90,
+				Color = ColorSequence.new({
+					ColorSequenceKeypoint.new(0, OrionLib.Themes[OrionLib.SelectedTheme].Second:Lerp(OrionLib.Themes[OrionLib.SelectedTheme].Main, 0.35)),
+					ColorSequenceKeypoint.new(1, OrionLib.Themes[OrionLib.SelectedTheme].Main)
+				})
+			}),
 			PremiumCrown,
 			WindowName,
 			WindowTopBarLine,
 			AddThemeObject(SetChildren(SetProps(MakeElement("RoundFrame", Color3.fromRGB(255, 255, 255), 0, 18), {
-				Size = UDim2.new(0, 168, 0, 38),
-				Position = UDim2.new(1, -218, 0, 8),
-				AnchorPoint = Vector2.new(1, 0),
-				Name = "TabSearchBar",
-				BackgroundTransparency = 0.52,
-				ClipsDescendants = true
-			}), {
-				AddThemeObject(SetProps(MakeElement("Stroke"), {
-					Transparency = 0.88,
-					Thickness = 1.05,
-					LineJoinMode = Enum.LineJoinMode.Round
-				}), "Stroke"),
-				AddThemeObject(SetProps(MakeElement("Image", "search"), {
-					Size = UDim2.new(0, 16, 0, 16),
-					Position = UDim2.new(0, 12, 0.5, -8),
-					ImageTransparency = 0.32,
-					Name = "SearchIco"
-				}), "TextDark"),
-				(function()
-					local tb = Create("TextBox", {
-						Name = "TabSearchInput",
-						Size = UDim2.new(1, -40, 0, 26),
-						Position = UDim2.new(0, 32, 0.5, -13),
-						BackgroundTransparency = 1,
-						Text = "",
-						PlaceholderText = "Tabs durchsuchen…",
-						TextColor3 = OrionLib.Themes[OrionLib.SelectedTheme].Text,
-						PlaceholderColor3 = OrionLib.Themes[OrionLib.SelectedTheme].TextDark,
-						TextSize = 14,
-						Font = Enum.Font.GothamMedium,
-						ClearTextOnFocus = false,
-						TextXAlignment = Enum.TextXAlignment.Left,
-						TextTruncate = Enum.TextTruncate.AtEnd
-					})
-					TabSearchInputRef = tb
-					return tb
-				end)()
-			}), "Second"),
-			AddThemeObject(SetChildren(SetProps(MakeElement("RoundFrame", Color3.fromRGB(255, 255, 255), 0, 18), {
 				Size = UDim2.new(0, 88, 0, 38),
-				Position = UDim2.new(1, -98, 0, 8),
+				Position = UDim2.new(1, -12, 0, 8),
+				AnchorPoint = Vector2.new(1, 0),
 				Name = "WinControls",
-				BackgroundTransparency = 0.44,
+				BackgroundTransparency = 0.52,
 				ZIndex = 15
 			}), {
 				AddThemeObject(SetProps(MakeElement("Stroke"), {
@@ -1510,10 +1499,6 @@ function OrionLib:MakeWindow(WindowConfig)
 
 	table.insert(OrionLib._ThemeListeners, function()
 		local T = OrionLib.Themes[OrionLib.SelectedTheme]
-		if TabSearchInputRef and TabSearchInputRef.Parent then
-			TabSearchInputRef.TextColor3 = T.Text
-			TabSearchInputRef.PlaceholderColor3 = T.TextDark
-		end
 		local ch = MainWindow:FindFirstChild("WindowChrome", true)
 		local pal = OrionLib.Themes[OrionLib.SelectedTheme]
 		if ch and ch:IsA("UIStroke") and pal then
@@ -1745,37 +1730,10 @@ function OrionLib:MakeWindow(WindowConfig)
 	end	
 
 	local function ApplyTabSearchFilter()
-		local bar = MainWindow.TopBar:FindFirstChild("TabSearchBar")
-		if not bar then return end
-		local inp = bar:FindFirstChild("TabSearchInput")
-		if not inp then return end
-		local raw = inp.Text or ""
-		local q = string.lower((raw:gsub("^%s+", ""):gsub("%s+$", "")))
-		local ph = inp.PlaceholderText or ""
-		if ph ~= "" and raw == ph then
-			q = ""
-		end
-		if #q == 0 then
-			for _, entry in ipairs(TabSearchRegistry) do
-				entry.Frame.Visible = true
-			end
-			RefreshTabHolderCanvas()
-			return
-		end
-		for _, entry in ipairs(TabSearchRegistry) do
-			local show = string.find(entry.Key, q, 1, true) ~= nil or entry.Frame == SelectedTabButton
-			entry.Frame.Visible = show
-		end
-		RefreshTabHolderCanvas()
+		return
 	end
 
-	local searchBar = MainWindow.TopBar:FindFirstChild("TabSearchBar")
-	if searchBar then
-		local sInput = searchBar:FindFirstChild("TabSearchInput")
-		if sInput then
-			AddConnection(sInput:GetPropertyChangedSignal("Text"), ApplyTabSearchFilter)
-		end
-	end
+	-- tab search removed
 
 	if OrionLib.AllowDrag ~= false then
 		local dp = MainWindow:FindFirstChild("TopBar") or DragPoint
@@ -2099,7 +2057,7 @@ function OrionLib:MakeWindow(WindowConfig)
 			Container.Visible = true   
 		end)
 
-		table.insert(TabSearchRegistry, { Frame = TabFrame, Key = string.lower(TabConfig.Name) })
+		-- tab search removed
 		task.defer(RefreshTabHolderCanvas)
 		task.defer(ApplyTabSearchFilter)
 
