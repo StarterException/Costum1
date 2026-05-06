@@ -175,7 +175,8 @@ local OrionLib = {
 		"Aurum", "RubyLux", "Nexus", "Nocturne"
 	},
 	SelectedTheme = "Default",
-	Locked = true,
+	AllowDrag = true,
+	AllowResize = false,
 	Folder = nil,
 	SaveCfg = false
 }
@@ -345,7 +346,7 @@ task.spawn(function()
 end)
 
 local function AddDraggingFunctionality(DragPoint, Main)
-	if OrionLib.Locked then
+	if OrionLib.AllowDrag == false then
 		return
 	end
 	local dragging = false
@@ -1241,7 +1242,7 @@ function OrionLib:MakeWindow(WindowConfig)
 	}), {}), "TextDark")
 
 	AddConnection(ResizeGrip.InputBegan, function(input)
-	if OrionLib.Locked then
+	if OrionLib.AllowResize == false then
 		return
 	end
 		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
@@ -1734,7 +1735,9 @@ function OrionLib:MakeWindow(WindowConfig)
 		end
 	end
 
-	-- locked UI: no dragging
+	if OrionLib.AllowDrag ~= false then
+		AddDraggingFunctionality(DragPoint, MainWindow)
+	end
 
 	local TTextCol = OrionLib.Themes[OrionLib.SelectedTheme].Text
 	local TAcc2Col = OrionLib.Themes[OrionLib.SelectedTheme].Accent2
